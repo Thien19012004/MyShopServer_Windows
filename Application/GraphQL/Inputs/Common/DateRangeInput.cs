@@ -1,6 +1,6 @@
 ﻿namespace MyShopServer.Application.GraphQL.Inputs.Common;
 
 public record DateRangeInput(
-    DateTime? From,
-    DateTime? To
+    [property: GraphQLType(typeof(DateType))] DateTime? From,
+    [property: GraphQLType(typeof(DateType))] DateTime? To
 );

@@ -34,6 +34,7 @@ namespace MyShopServer
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<ICategoryService, CategoryService>();
             builder.Services.AddScoped<IOrderService, OrderService>();
+            builder.Services.AddScoped<IReportService, ReportService>();
 
             // =========================
             // 3. JWT Authentication
@@ -73,8 +74,10 @@ namespace MyShopServer
                 .AddTypeExtension<ProductMutations>()
                 .AddTypeExtension<CategoryQueries>()
                 .AddTypeExtension<CategoryMutations>()
+                .AddTypeExtension<ReportQueries>()
                 .AddTypeExtension<OrderQueries>()
                 .AddTypeExtension<OrderMutations>()
+
                 .AddType<ProductListItemType>()
                 .AddType<ProductDetailType>()
                 .AddProjections()
