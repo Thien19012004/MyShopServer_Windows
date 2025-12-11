@@ -1,36 +1,55 @@
+﻿using Microsoft.EntityFrameworkCore;
+using MyShopServer.Infrastructure.Data;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace MyShopServer
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // Add services to the container.
+            // =========================
+            // 1. DbContext + SQLite
+            // =========================
+            var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+                                   ?? "Data Source=MyShop.db";
 
-            builder.Services.AddControllers();
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-            builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
+            builder.Services.AddDbContext<AppDbContext>(options =>
+                options.UseSqlite(connectionString));
+
+            // =========================
+            // 2. GraphQL server
+            // =========================
+            builder.Services
+                .AddGraphQLServer()
+                .AddQueryType<Query>()
+                .AddProjections()
+                .AddFiltering()
+                .AddSorting();
 
             var app = builder.Build();
 
-            // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
+            // =========================
+            // 3. Migrate + Seed (nếu đã tạo AppDbContextSeed)
+            // =========================
+            using (var scope = app.Services.CreateScope())
             {
-                app.UseSwagger();
-                app.UseSwaggerUI();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                await db.Database.MigrateAsync();
+
+                // Nếu bạn đã tạo AppDbContextSeed thì giữ dòng này,
+                // chưa có thì comment lại.
+                await AppDbContextSeed.SeedAsync(db);
             }
 
-            app.UseHttpsRedirection();
+            // =========================
+            // 4. Map GraphQL endpoint
+            // =========================
+            app.MapGraphQL("/graphql");
 
-            app.UseAuthorization();
-
-
-            app.MapControllers();
-
-            app.Run();
+            await app.RunAsync();
         }
     }
 }

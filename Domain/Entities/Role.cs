@@ -1,10 +1,12 @@
-﻿namespace MyShopServer.Domain.Entities
+﻿using MyShopServer.Domain.Enums;
+
+namespace MyShopServer.Domain.Entities
 {
     public class Role
     {
         public int RoleId { get; set; }
-        public string RoleName { get; set; } = string.Empty;
+        public RoleName RoleName { get; set; }
 
-        public ICollection<UserRole> UserRoles { get; set; }
+        public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     }
 }

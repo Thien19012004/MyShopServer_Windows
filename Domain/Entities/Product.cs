@@ -15,6 +15,8 @@ public class Product
     public int CategoryId { get; set; }
     public Category Category { get; set; }
 
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+
     public ICollection<OrderItem> OrderItems { get; set; }
     public ICollection<ProductPromotion> ProductPromotions { get; set; }
     public ICollection<ProductImage> Images { get; set; }

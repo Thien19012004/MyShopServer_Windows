@@ -1,4 +1,6 @@
-﻿namespace MyShopServer.Domain.Entities;
+﻿using MyShopServer.Domain.Enums;
+
+namespace MyShopServer.Domain.Entities;
 
 public class Order
 {
@@ -8,7 +10,7 @@ public class Order
     public int SaleId { get; set; }
     public User Sale { get; set; }
 
-    public string Status { get; set; } = "Created";
+    public OrderStatus Status { get; set; }
     public int TotalPrice { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.Now;
