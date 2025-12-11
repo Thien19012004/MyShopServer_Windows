@@ -1,7 +1,9 @@
-﻿using HotChocolate.Types;
+﻿using HotChocolate.Authorization;
+using HotChocolate.Types;
 using MyShopServer.Application.GraphQL.Inputs.Common;
 using MyShopServer.Application.GraphQL.Inputs.Products;
 using MyShopServer.Application.Services.Interfaces;
+using MyShopServer.Domain.Enums;
 using MyShopServer.DTOs.Common;
 using MyShopServer.DTOs.Products;
 
@@ -10,6 +12,8 @@ namespace MyShopServer.Application.GraphQL.Queries;
 [ExtendObjectType(typeof(Query))]
 public class ProductQueries
 {
+    // Cho mọi user đã đăng nhập (Admin/Moderator/Sale) xem danh sách
+    [Authorize]
     public async Task<ProductListResultDto> Products(
         PaginationInput? pagination,
         ProductFilterInput? filter,
@@ -53,6 +57,8 @@ public class ProductQueries
         }
     }
 
+    // Cho mọi user đã đăng nhập xem chi tiết sản phẩm
+    [Authorize]
     public async Task<ProductResultDto> ProductById(
         int productId,
         [Service] IProductService productService,
@@ -92,5 +98,4 @@ public class ProductQueries
             };
         }
     }
-
 }
