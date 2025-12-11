@@ -33,6 +33,7 @@ namespace MyShopServer
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<ICategoryService, CategoryService>();
+            builder.Services.AddScoped<IOrderService, OrderService>();
 
             // =========================
             // 3. JWT Authentication
@@ -59,9 +60,7 @@ namespace MyShopServer
                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key))
                     };
                 });
-
             builder.Services.AddAuthorization();
-
             // =========================
             // 4. GraphQL server
             // =========================
@@ -74,11 +73,14 @@ namespace MyShopServer
                 .AddTypeExtension<ProductMutations>()
                 .AddTypeExtension<CategoryQueries>()
                 .AddTypeExtension<CategoryMutations>()
+                .AddTypeExtension<OrderQueries>()
+                .AddTypeExtension<OrderMutations>()
                 .AddType<ProductListItemType>()
                 .AddType<ProductDetailType>()
                 .AddProjections()
                 .AddFiltering()
-                .AddSorting();
+                .AddSorting()
+                .AddAuthorization();
 
             var app = builder.Build();
 
