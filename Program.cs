@@ -1,12 +1,14 @@
-﻿using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MyShopServer.Application.GraphQL;
 using MyShopServer.Application.GraphQL.Mutations;
+using MyShopServer.Application.GraphQL.Queries;
+using MyShopServer.Application.GraphQL.Types;
 using MyShopServer.Application.Services.Implementations;
 using MyShopServer.Application.Services.Interfaces;
 using MyShopServer.Infrastructure.Data;
+using System.Text;
 
 namespace MyShopServer
 {
@@ -26,9 +28,10 @@ namespace MyShopServer
                 options.UseSqlite(connectionString));
 
             // =========================
-            // 2. AuthService (DI)
+            // 2. Services (DI)
             // =========================
             builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddScoped<IProductService, ProductService>();
 
             // =========================
             // 3. JWT Authentication
@@ -66,6 +69,10 @@ namespace MyShopServer
                 .AddQueryType<Query>()
                 .AddMutationType<Mutation>()
                 .AddTypeExtension<AuthMutations>()
+                .AddTypeExtension<ProductQueries>()
+                .AddTypeExtension<ProductMutations>()
+                .AddType<ProductListItemType>()
+                .AddType<ProductDetailType>()
                 .AddProjections()
                 .AddFiltering()
                 .AddSorting();
@@ -79,8 +86,6 @@ namespace MyShopServer
             {
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 await db.Database.MigrateAsync();
-
-                // nếu bạn có AppDbContextSeed thì gọi ở đây
                 await AppDbContextSeed.SeedAsync(db);
             }
 
