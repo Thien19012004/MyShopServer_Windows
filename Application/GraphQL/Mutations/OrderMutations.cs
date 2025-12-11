@@ -1,13 +1,19 @@
-﻿using HotChocolate.Types;
-using MyShopServer.Application.GraphQL.Inputs.Orders;
+﻿using MyShopServer.Application.GraphQL.Inputs.Orders;
 using MyShopServer.Application.Services.Interfaces;
+using MyShopServer.Domain.Enums;
 using MyShopServer.DTOs.Orders;
+using HotChocolate.Authorization;
 
 namespace MyShopServer.Application.GraphQL.Mutations;
 
 [ExtendObjectType(typeof(Mutation))]
 public class OrderMutations
 {
+    [Authorize(Roles = new[]
+   {
+        nameof(RoleName.Admin),
+        nameof(RoleName.Sale)
+    })]
     public async Task<OrderResultDto> CreateOrder(
         CreateOrderInput input,
         [Service] IOrderService orderService,
@@ -50,6 +56,11 @@ public class OrderMutations
         }
     }
 
+    [Authorize(Roles = new[]
+    {
+        nameof(RoleName.Admin),
+        nameof(RoleName.Sale)
+    })]
     public async Task<OrderResultDto> UpdateOrder(
         int orderId,
         UpdateOrderInput input,
@@ -91,6 +102,12 @@ public class OrderMutations
         }
     }
 
+
+    [Authorize(Roles = new[]
+    {
+        nameof(RoleName.Admin),
+        nameof(RoleName.Moderator)
+    })]
     public async Task<OrderResultDto> DeleteOrder(
         int orderId,
         [Service] IOrderService orderService,

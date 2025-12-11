@@ -60,9 +60,7 @@ namespace MyShopServer
                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key))
                     };
                 });
-
             builder.Services.AddAuthorization();
-
             // =========================
             // 4. GraphQL server
             // =========================
@@ -81,7 +79,8 @@ namespace MyShopServer
                 .AddType<ProductDetailType>()
                 .AddProjections()
                 .AddFiltering()
-                .AddSorting();
+                .AddSorting()
+                .AddAuthorization();
 
             var app = builder.Build();
 
