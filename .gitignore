@@ -11,6 +11,10 @@
 *.sln.docstates
 *.env
 
+# SQLite
+MyShop.db
+*.db
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
