@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using MyShopServer.Domain.Entities;
 using MyShopServer.Domain.Enums;
+using MyShopServer.Domain.Common;
 
 namespace MyShopServer.Infrastructure.Data;
 
@@ -30,12 +31,12 @@ public static class AppDbContextSeed
         // ======================
         // PasswordHash ở đây chỉ là placeholder, sau bạn đổi thành hash thật cũng ok
         var users = new[]
-        {
+         {
             new User
             {
                 UserId = 1,
                 Username = "admin",
-                PasswordHash = "admin123-hash",
+                PasswordHash = PasswordHasher.Hash("admin123"),
                 FullName = "System Administrator",
                 IsActive = true,
                 CreatedAt = now.AddDays(-30),
@@ -44,7 +45,7 @@ public static class AppDbContextSeed
             {
                 UserId = 2,
                 Username = "mod",
-                PasswordHash = "mod123-hash",
+                PasswordHash = PasswordHasher.Hash("mod123"),
                 FullName = "Store Moderator",
                 IsActive = true,
                 CreatedAt = now.AddDays(-20),
@@ -53,7 +54,7 @@ public static class AppDbContextSeed
             {
                 UserId = 3,
                 Username = "sale_a",
-                PasswordHash = "sale123-hash",
+                PasswordHash = PasswordHasher.Hash("sale123"),
                 FullName = "Sale A",
                 IsActive = true,
                 CreatedAt = now.AddDays(-10),
@@ -62,7 +63,7 @@ public static class AppDbContextSeed
             {
                 UserId = 4,
                 Username = "sale_b",
-                PasswordHash = "sale123-hash",
+                PasswordHash = PasswordHasher.Hash("sale123"),
                 FullName = "Sale B",
                 IsActive = true,
                 CreatedAt = now.AddDays(-5),
