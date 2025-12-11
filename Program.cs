@@ -1,6 +1,12 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using MyShopServer.Application.GraphQL;
+using MyShopServer.Application.GraphQL.Mutations;
+using MyShopServer.Application.Services.Implementations;
+using MyShopServer.Application.Services.Interfaces;
 using MyShopServer.Infrastructure.Data;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace MyShopServer
 {
@@ -20,11 +26,46 @@ namespace MyShopServer
                 options.UseSqlite(connectionString));
 
             // =========================
-            // 2. GraphQL server
+            // 2. AuthService (DI)
+            // =========================
+            builder.Services.AddScoped<IAuthService, AuthService>();
+
+            // =========================
+            // 3. JWT Authentication
+            // =========================
+            var jwtSection = builder.Configuration.GetSection("Jwt");
+            var key = jwtSection["Key"] ?? "DEV_KEY_CHANGE_ME";
+
+            builder.Services
+                .AddAuthentication(options =>
+                {
+                    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                })
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        ValidIssuer = jwtSection["Issuer"],
+                        ValidAudience = jwtSection["Audience"],
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key))
+                    };
+                });
+
+            builder.Services.AddAuthorization();
+
+            // =========================
+            // 4. GraphQL server
             // =========================
             builder.Services
                 .AddGraphQLServer()
                 .AddQueryType<Query>()
+                .AddMutationType<Mutation>()
+                .AddTypeExtension<AuthMutations>()
                 .AddProjections()
                 .AddFiltering()
                 .AddSorting();
@@ -32,21 +73,23 @@ namespace MyShopServer
             var app = builder.Build();
 
             // =========================
-            // 3. Migrate + Seed (nếu đã tạo AppDbContextSeed)
+            // 5. Migrate + (optional) seed
             // =========================
             using (var scope = app.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 await db.Database.MigrateAsync();
 
-                // Nếu bạn đã tạo AppDbContextSeed thì giữ dòng này,
-                // chưa có thì comment lại.
+                // nếu bạn có AppDbContextSeed thì gọi ở đây
                 await AppDbContextSeed.SeedAsync(db);
             }
 
             // =========================
-            // 4. Map GraphQL endpoint
+            // 6. Middleware
             // =========================
+            app.UseAuthentication();
+            app.UseAuthorization();
+
             app.MapGraphQL("/graphql");
 
             await app.RunAsync();

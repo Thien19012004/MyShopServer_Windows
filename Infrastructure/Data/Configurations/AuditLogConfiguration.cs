@@ -10,7 +10,7 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
     {
         builder.ToTable("AuditLogs");
 
-        builder.HasKey(a => a.LogId);
+        builder.HasKey(a => a.AuditLogId);
 
         builder.Property(a => a.Action)
             .IsRequired()
