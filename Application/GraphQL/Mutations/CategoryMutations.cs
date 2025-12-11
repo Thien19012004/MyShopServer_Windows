@@ -1,6 +1,8 @@
-﻿using HotChocolate.Types;
+﻿using HotChocolate.Authorization;
+using HotChocolate.Types;
 using MyShopServer.Application.GraphQL.Inputs.Categories;
 using MyShopServer.Application.Services.Interfaces;
+using MyShopServer.Domain.Enums;
 using MyShopServer.DTOs.Categories;
 
 namespace MyShopServer.Application.GraphQL.Mutations;
@@ -8,6 +10,12 @@ namespace MyShopServer.Application.GraphQL.Mutations;
 [ExtendObjectType(typeof(Mutation))]
 public class CategoryMutations
 {
+    // Chỉ Admin + Moderator được tạo category
+    [Authorize(Roles = new[]
+    {
+        nameof(RoleName.Admin),
+        nameof(RoleName.Moderator)
+    })]
     public async Task<CategoryResultDto> CreateCategory(
         CreateCategoryInput input,
         [Service] ICategoryService categoryService,
@@ -43,6 +51,12 @@ public class CategoryMutations
         }
     }
 
+    // Chỉ Admin + Moderator được sửa category
+    [Authorize(Roles = new[]
+    {
+        nameof(RoleName.Admin),
+        nameof(RoleName.Moderator)
+    })]
     public async Task<CategoryResultDto> UpdateCategory(
         int categoryId,
         UpdateCategoryInput input,
@@ -93,6 +107,12 @@ public class CategoryMutations
         }
     }
 
+    // Chỉ Admin + Moderator được xoá category
+    [Authorize(Roles = new[]
+    {
+        nameof(RoleName.Admin),
+        nameof(RoleName.Moderator)
+    })]
     public async Task<CategoryResultDto> DeleteCategory(
         int categoryId,
         [Service] ICategoryService categoryService,

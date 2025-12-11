@@ -1,6 +1,8 @@
-﻿using HotChocolate.Types;
+﻿using HotChocolate.Authorization;
+using HotChocolate.Types;
 using MyShopServer.Application.GraphQL.Inputs.Common;
 using MyShopServer.Application.Services.Interfaces;
+using MyShopServer.Domain.Enums;
 using MyShopServer.DTOs.Categories;
 
 namespace MyShopServer.Application.GraphQL.Queries;
@@ -8,9 +10,11 @@ namespace MyShopServer.Application.GraphQL.Queries;
 [ExtendObjectType(typeof(Query))]
 public class CategoryQueries
 {
+    // Cho mọi user đã đăng nhập xem danh sách category
+    [Authorize]
     public async Task<CategoryListResultDto> Categories(
         PaginationInput? pagination,
-        string? search,  // optional filter theo tên
+        string? search,
         [Service] ICategoryService categoryService,
         CancellationToken ct)
     {
@@ -45,6 +49,8 @@ public class CategoryQueries
         }
     }
 
+    // Cho mọi user đã đăng nhập xem chi tiết 1 category
+    [Authorize]
     public async Task<CategoryResultDto> CategoryById(
         int categoryId,
         [Service] ICategoryService categoryService,
