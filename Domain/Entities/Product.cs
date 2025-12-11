@@ -16,4 +16,6 @@ public class Product
     public Category Category { get; set; }
 
     public ICollection<OrderItem> OrderItems { get; set; }
+    public ICollection<ProductPromotion> ProductPromotions { get; set; }
+    public ICollection<ProductImage> Images { get; set; }
 }

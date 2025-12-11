@@ -6,6 +6,7 @@ public class Order
 
     public int? CustomerId { get; set; }
     public int SaleId { get; set; }
+    public User Sale { get; set; }
 
     public string Status { get; set; } = "Created";
     public int TotalPrice { get; set; }
@@ -14,4 +15,6 @@ public class Order
 
     public ICollection<OrderItem> Items { get; set; }
     public ICollection<Payment> Payments { get; set; }
+    public Customer? Customer { get; set; }
+
 }
