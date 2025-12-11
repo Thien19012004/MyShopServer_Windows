@@ -1,6 +1,8 @@
-﻿using HotChocolate.Types;
+﻿using HotChocolate.Authorization;
+using HotChocolate.Types;
 using MyShopServer.Application.GraphQL.Inputs.Products;
 using MyShopServer.Application.Services.Interfaces;
+using MyShopServer.Domain.Enums;
 using MyShopServer.DTOs.Products;
 
 namespace MyShopServer.Application.GraphQL.Mutations;
@@ -8,6 +10,12 @@ namespace MyShopServer.Application.GraphQL.Mutations;
 [ExtendObjectType(typeof(Mutation))]
 public class ProductMutations
 {
+    // Chỉ Admin + Moderator được tạo sản phẩm
+    [Authorize(Roles = new[]
+    {
+        nameof(RoleName.Admin),
+        nameof(RoleName.Moderator)
+    })]
     public async Task<ProductResultDto> CreateProduct(
         CreateProductInput input,
         [Service] IProductService productService,
@@ -49,6 +57,12 @@ public class ProductMutations
         }
     }
 
+    // Chỉ Admin + Moderator được sửa sản phẩm
+    [Authorize(Roles = new[]
+    {
+        nameof(RoleName.Admin),
+        nameof(RoleName.Moderator)
+    })]
     public async Task<ProductResultDto> UpdateProduct(
         int productId,
         UpdateProductInput input,
@@ -57,7 +71,6 @@ public class ProductMutations
     {
         try
         {
-            // Lấy product hiện tại
             var existing = await productService.GetProductByIdAsync(productId, ct);
             if (existing == null)
             {
@@ -70,7 +83,6 @@ public class ProductMutations
                 };
             }
 
-            // Merge: nếu input field null thì giữ giá trị cũ
             var dto = new ProductDetailDto
             {
                 ProductId = existing.ProductId,
@@ -107,10 +119,16 @@ public class ProductMutations
         }
     }
 
+    // Chỉ Admin + Moderator được xoá sản phẩm
+    [Authorize(Roles = new[]
+    {
+        nameof(RoleName.Admin),
+        nameof(RoleName.Moderator)
+    })]
     public async Task<ProductResultDto> DeleteProduct(
-    int productId,
-    [Service] IProductService productService,
-    CancellationToken ct)
+        int productId,
+        [Service] IProductService productService,
+        CancellationToken ct)
     {
         try
         {
@@ -136,7 +154,6 @@ public class ProductMutations
         }
         catch (Exception ex)
         {
-            // ví dụ: "Cannot delete product because it has related order items."
             return new ProductResultDto
             {
                 StatusCode = 400,
@@ -146,5 +163,4 @@ public class ProductMutations
             };
         }
     }
-
 }
