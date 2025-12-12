@@ -5,8 +5,10 @@ using MyShopServer.Application.GraphQL;
 using MyShopServer.Application.GraphQL.Mutations;
 using MyShopServer.Application.GraphQL.Queries;
 using MyShopServer.Application.GraphQL.Types;
+using HotChocolate.Types;
 using MyShopServer.Application.Services.Implementations;
 using MyShopServer.Application.Services.Interfaces;
+using MyShopServer.Infrastructure.Cloudinary;
 using MyShopServer.Infrastructure.Data;
 using System.Text;
 
@@ -36,6 +38,9 @@ namespace MyShopServer
             builder.Services.AddScoped<IOrderService, OrderService>();
             builder.Services.AddScoped<IDashboardService, DashboardService>();
             builder.Services.AddScoped<IReportAnalyticsService, ReportAnalyticsService>();
+            builder.Services.AddScoped<IImageStorageService, CloudinaryImageStorageService>();
+
+            builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection("Cloudinary"));
 
             // =========================
             // 3. JWT Authentication
@@ -79,6 +84,8 @@ namespace MyShopServer
                 .AddTypeExtension<OrderQueries>()
                 .AddTypeExtension<OrderMutations>()
                 .AddTypeExtension<ReportQueries>()
+                .AddType<UploadType>()               
+                .AddTypeExtension<UploadMutations>()
                 .AddType<ProductListItemType>()
                 .AddType<ProductDetailType>()
                 .AddProjections()
