@@ -77,7 +77,6 @@ namespace MyShopServer
                 .AddTypeExtension<DashboardQueries>()
                 .AddTypeExtension<OrderQueries>()
                 .AddTypeExtension<OrderMutations>()
-
                 .AddType<ProductListItemType>()
                 .AddType<ProductDetailType>()
                 .AddProjections()
