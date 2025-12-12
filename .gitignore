@@ -15,6 +15,9 @@
 MyShop.db
 *.db
 
+# settings
+appsettings.Development.json
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
