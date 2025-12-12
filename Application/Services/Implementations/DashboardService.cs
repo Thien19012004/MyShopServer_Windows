@@ -6,11 +6,11 @@ using MyShopServer.Infrastructure.Data;
 
 namespace MyShopServer.Application.Services.Implementations;
 
-public class ReportService : IReportService
+public class DashboardService : IDashboardService
 {
     private readonly AppDbContext _db;
 
-    public ReportService(AppDbContext db)
+    public DashboardService(AppDbContext db)
     {
         _db = db;
     }

@@ -7,7 +7,7 @@ using MyShopServer.DTOs.Reports;
 namespace MyShopServer.Application.GraphQL.Queries;
 
 [ExtendObjectType(typeof(Query))]
-public class ReportQueries
+public class DashboardQueries
 {
     // 1. Thẻ tổng quan dashboard
     [Authorize(Roles = new[]
@@ -16,12 +16,12 @@ public class ReportQueries
         nameof(RoleName.Moderator)
     })]
     public async Task<DashboardOverviewResultDto> ReportOverview(
-        [Service] IReportService reportService,
+        [Service] IDashboardService dashboardService,
         CancellationToken ct)
     {
         try
         {
-            var dto = await reportService.GetDashboardOverviewAsync(ct);
+            var dto = await dashboardService.GetDashboardOverviewAsync(ct);
             return new DashboardOverviewResultDto
             {
                 StatusCode = 200,
@@ -49,14 +49,14 @@ public class ReportQueries
         nameof(RoleName.Moderator)
     })]
     public async Task<LowStockProductListResultDto> ReportLowStockProducts(
-        [Service] IReportService reportService,
+        [Service] IDashboardService dashboardService,
         int threshold = 5,
         int take = 5,
         CancellationToken ct = default)
     {
         try
         {
-            var list = await reportService.GetLowStockProductsAsync(threshold, take, ct);
+            var list = await dashboardService.GetLowStockProductsAsync(threshold, take, ct);
             return new LowStockProductListResultDto
             {
                 StatusCode = 200,
@@ -84,7 +84,7 @@ public class ReportQueries
         nameof(RoleName.Moderator)
     })]
     public async Task<TopSellingProductListResultDto> ReportTopSellingProducts(
-        [Service] IReportService reportService,
+        [Service] IDashboardService dashboardService,
         DateRangeInput? dateRange,
         int take = 5,
         CancellationToken ct = default)
@@ -94,7 +94,7 @@ public class ReportQueries
             DateTime? from = dateRange?.From;
             DateTime? to = dateRange?.To;
 
-            var list = await reportService.GetTopSellingProductsAsync(from, to, take, ct);
+            var list = await dashboardService.GetTopSellingProductsAsync(from, to, take, ct);
 
             return new TopSellingProductListResultDto
             {
@@ -123,13 +123,13 @@ public class ReportQueries
         nameof(RoleName.Moderator)
     })]
     public async Task<RecentOrderListResultDto> ReportRecentOrders(
-        [Service] IReportService reportService,
+        [Service] IDashboardService dashboardService,
         int take = 3,
         CancellationToken ct = default)
     {
         try
         {
-            var list = await reportService.GetRecentOrdersAsync(take, ct);
+            var list = await dashboardService.GetRecentOrdersAsync(take, ct);
             return new RecentOrderListResultDto
             {
                 StatusCode = 200,
@@ -159,12 +159,12 @@ public class ReportQueries
     public async Task<DailyRevenueListResultDto> ReportDailyRevenueInMonth(
         int? year,
         int? month,
-        [Service] IReportService reportService,
+        [Service] IDashboardService dashboardService,
         CancellationToken ct)
     {
         try
         {
-            var list = await reportService.GetDailyRevenueInMonthAsync(year, month, ct);
+            var list = await dashboardService.GetDailyRevenueInMonthAsync(year, month, ct);
             return new DailyRevenueListResultDto
             {
                 StatusCode = 200,
