@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using MyShopServer.DTOs.Common;
+﻿using MyShopServer.DTOs.Common;
 
 namespace MyShopServer.DTOs.Reports;
 

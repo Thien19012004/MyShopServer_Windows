@@ -2,7 +2,7 @@
 
 namespace MyShopServer.Application.Services.Interfaces;
 
-public interface IReportService
+public interface IDashboardService
 {
     Task<DashboardOverviewDto> GetDashboardOverviewAsync(CancellationToken ct = default);
 
