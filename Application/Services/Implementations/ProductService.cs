@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using MyShopServer.Application.Common;
 using MyShopServer.Application.Services.Interfaces;
 using MyShopServer.DTOs.Common;
 using MyShopServer.DTOs.Products;
@@ -19,58 +20,118 @@ public class ProductService : IProductService
     ProductQueryOptions options,
     CancellationToken ct = default)
     {
+        var page = options.Page <= 0 ? 1 : options.Page;
+        var pageSize = options.PageSize <= 0 ? 10 : options.PageSize;
+
+        // Base query: filter “cứng” chạy DB cho nhẹ
         var query = _db.Products
             .AsNoTracking()
             .Include(p => p.Category)
             .AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(options.Search))
-        {
-            query = query.Where(p => p.Name.Contains(options.Search));
-        }
-
         if (options.CategoryId.HasValue)
-        {
             query = query.Where(p => p.CategoryId == options.CategoryId.Value);
-        }
 
         if (options.MinPrice.HasValue)
-        {
             query = query.Where(p => p.SalePrice >= options.MinPrice.Value);
-        }
 
         if (options.MaxPrice.HasValue)
-        {
             query = query.Where(p => p.SalePrice <= options.MaxPrice.Value);
+
+        // Nếu KHÔNG search -> giữ nguyên sort + paging trong DB (tối ưu)
+        if (string.IsNullOrWhiteSpace(options.Search))
+        {
+            query = (options.SortBy, options.SortAsc) switch
+            {
+                (ProductSortBy.SalePrice, true) => query.OrderBy(p => p.SalePrice),
+                (ProductSortBy.SalePrice, false) => query.OrderByDescending(p => p.SalePrice),
+
+                (ProductSortBy.ImportPrice, true) => query.OrderBy(p => p.ImportPrice),
+                (ProductSortBy.ImportPrice, false) => query.OrderByDescending(p => p.ImportPrice),
+
+                (ProductSortBy.StockQuantity, true) => query.OrderBy(p => p.StockQuantity),
+                (ProductSortBy.StockQuantity, false) => query.OrderByDescending(p => p.StockQuantity),
+
+                (ProductSortBy.CreatedAt, true) => query.OrderBy(p => p.CreatedAt),
+                (ProductSortBy.CreatedAt, false) => query.OrderByDescending(p => p.CreatedAt),
+
+                (_, true) => query.OrderBy(p => p.Name),
+                (_, false) => query.OrderByDescending(p => p.Name),
+            };
+
+            var totalItems = await query.CountAsync(ct);
+
+            var items = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(p => new ProductListItemDto
+                {
+                    ProductId = p.ProductId,
+                    Sku = p.Sku,
+                    Name = p.Name,
+                    ImportPrice = p.ImportPrice,
+                    SalePrice = p.SalePrice,
+                    StockQuantity = p.StockQuantity,
+                    CategoryName = p.Category!.Name
+                })
+                .ToListAsync(ct);
+
+            return new PagedResult<ProductListItemDto>
+            {
+                Items = items,
+                TotalItems = totalItems,
+                Page = page,
+                PageSize = pageSize
+            };
         }
 
-        // ====== SORT ======
-        query = (options.SortBy, options.SortAsc) switch
+        // Có SEARCH -> dùng Normalize() lọc in-memory
+        var term = TextSearch.Normalize(options.Search);
+
+        // Lấy candidate list sau khi đã filter cứng
+        var raw = await query
+            .Select(p => new
+            {
+                p.ProductId,
+                p.Sku,
+                p.Name,
+                p.ImportPrice,
+                p.SalePrice,
+                p.StockQuantity,
+                CategoryName = p.Category!.Name
+            })
+            .ToListAsync(ct);
+
+        // Filter bằng key normalize: match name + sku
+        var filtered = raw
+            .Where(p =>
+            {
+                var key = TextSearch.Normalize($"{p.Name} {p.Sku}");
+                return key.Contains(term);
+            });
+
+        // Sort in-memory
+        filtered = (options.SortBy, options.SortAsc) switch
         {
-            (ProductSortBy.SalePrice, true) => query.OrderBy(p => p.SalePrice),
-            (ProductSortBy.SalePrice, false) => query.OrderByDescending(p => p.SalePrice),
+            (ProductSortBy.SalePrice, true) => filtered.OrderBy(p => p.SalePrice),
+            (ProductSortBy.SalePrice, false) => filtered.OrderByDescending(p => p.SalePrice),
 
-            (ProductSortBy.ImportPrice, true) => query.OrderBy(p => p.ImportPrice),
-            (ProductSortBy.ImportPrice, false) => query.OrderByDescending(p => p.ImportPrice),
+            (ProductSortBy.ImportPrice, true) => filtered.OrderBy(p => p.ImportPrice),
+            (ProductSortBy.ImportPrice, false) => filtered.OrderByDescending(p => p.ImportPrice),
 
-            (ProductSortBy.StockQuantity, true) => query.OrderBy(p => p.StockQuantity),
-            (ProductSortBy.StockQuantity, false) => query.OrderByDescending(p => p.StockQuantity),
+            (ProductSortBy.StockQuantity, true) => filtered.OrderBy(p => p.StockQuantity),
+            (ProductSortBy.StockQuantity, false) => filtered.OrderByDescending(p => p.StockQuantity),
 
-            (ProductSortBy.CreatedAt, true) => query.OrderBy(p => p.CreatedAt),
-            (ProductSortBy.CreatedAt, false) => query.OrderByDescending(p => p.CreatedAt),
+            (ProductSortBy.CreatedAt, true) => filtered.OrderBy(p => p.ProductId),      // nếu bạn không có CreatedAt trong select
+            (ProductSortBy.CreatedAt, false) => filtered.OrderByDescending(p => p.ProductId),
 
-            // default: Name
-            (_, true) => query.OrderBy(p => p.Name),
-            (_, false) => query.OrderByDescending(p => p.Name),
+            (_, true) => filtered.OrderBy(p => p.Name),
+            (_, false) => filtered.OrderByDescending(p => p.Name),
         };
-        // ===================
 
-        var totalItems = await query.CountAsync(ct);
+        var total2 = filtered.Count();
 
-        var page = options.Page <= 0 ? 1 : options.Page;
-        var pageSize = options.PageSize <= 0 ? 10 : options.PageSize;
-
-        var items = await query
+        var items2 = filtered
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(p => new ProductListItemDto
@@ -81,14 +142,14 @@ public class ProductService : IProductService
                 ImportPrice = p.ImportPrice,
                 SalePrice = p.SalePrice,
                 StockQuantity = p.StockQuantity,
-                CategoryName = p.Category!.Name
+                CategoryName = p.CategoryName
             })
-            .ToListAsync(ct);
+            .ToList();
 
         return new PagedResult<ProductListItemDto>
         {
-            Items = items,
-            TotalItems = totalItems,
+            Items = items2,
+            TotalItems = total2,
             Page = page,
             PageSize = pageSize
         };
