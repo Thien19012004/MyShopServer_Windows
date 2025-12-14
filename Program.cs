@@ -39,6 +39,7 @@ namespace MyShopServer
             builder.Services.AddScoped<IDashboardService, DashboardService>();
             builder.Services.AddScoped<IReportAnalyticsService, ReportAnalyticsService>();
             builder.Services.AddScoped<IImageStorageService, CloudinaryImageStorageService>();
+            builder.Services.AddScoped<ICustomerService, CustomerService>();
 
             builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection("Cloudinary"));
 
@@ -84,6 +85,8 @@ namespace MyShopServer
                 .AddTypeExtension<OrderQueries>()
                 .AddTypeExtension<OrderMutations>()
                 .AddTypeExtension<ReportQueries>()
+                .AddTypeExtension<CustomerQueries>()
+                .AddTypeExtension<CustomerMutations>()
                 .AddType<UploadType>()               
                 .AddTypeExtension<UploadMutations>()
                 .AddType<ProductListItemType>()
