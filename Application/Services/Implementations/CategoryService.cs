@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using MyShopServer.Application.Common;
 using MyShopServer.Application.Services.Interfaces;
 using MyShopServer.DTOs.Categories;
 using MyShopServer.DTOs.Common;
@@ -16,29 +17,50 @@ public class CategoryService : ICategoryService
     }
 
     public async Task<PagedResult<CategoryDto>> GetAllAsync(
-        CategoryQueryOptions options,
-        CancellationToken ct = default)
+    CategoryQueryOptions options,
+    CancellationToken ct = default)
     {
+        var page = options.Page <= 0 ? 1 : options.Page;
+        var pageSize = options.PageSize <= 0 ? 10 : options.PageSize;
+
         var query = _db.Categories
             .AsNoTracking()
             .Include(c => c.Products)
             .AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(options.Search))
+        // Nếu KHÔNG search -> chạy DB như cũ
+        if (string.IsNullOrWhiteSpace(options.Search))
         {
-            query = query.Where(c => c.Name.Contains(options.Search));
+            query = query.OrderBy(c => c.Name);
+
+            var totalItems = await query.CountAsync(ct);
+
+            var items = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(c => new CategoryDto
+                {
+                    CategoryId = c.CategoryId,
+                    Name = c.Name,
+                    Description = c.Description,
+                    ProductCount = c.Products.Count
+                })
+                .ToListAsync(ct);
+
+            return new PagedResult<CategoryDto>
+            {
+                Items = items,
+                TotalItems = totalItems,
+                Page = page,
+                PageSize = pageSize
+            };
         }
 
-        query = query.OrderBy(c => c.Name); // sort mặc định theo tên
+        // Có SEARCH -> lọc in-memory
+        var term = TextSearch.Normalize(options.Search);
 
-        var totalItems = await query.CountAsync(ct);
-
-        var page = options.Page <= 0 ? 1 : options.Page;
-        var pageSize = options.PageSize <= 0 ? 10 : options.PageSize;
-
-        var items = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
+        // Load list thô
+        var raw = await query
             .Select(c => new CategoryDto
             {
                 CategoryId = c.CategoryId,
@@ -48,10 +70,26 @@ public class CategoryService : ICategoryService
             })
             .ToListAsync(ct);
 
+        var filtered = raw
+            .Where(c =>
+            {
+                var key = TextSearch.Normalize($"{c.Name} {c.Description}");
+                return key.Contains(term);
+            })
+            .OrderBy(c => c.Name)
+            .ToList();
+
+        var total2 = filtered.Count;
+
+        var items2 = filtered
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
         return new PagedResult<CategoryDto>
         {
-            Items = items,
-            TotalItems = totalItems,
+            Items = items2,
+            TotalItems = total2,
             Page = page,
             PageSize = pageSize
         };
