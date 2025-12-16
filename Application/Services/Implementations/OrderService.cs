@@ -42,6 +42,46 @@ public class OrderService : IOrderService
             .ToDictionaryAsync(x => x.ProductId, x => x.Best, ct);
     }
 
+    private async Task EnsurePromotionStillValidWhenPayAsync(
+    IReadOnlyCollection<Domain.Entities.OrderItem> items,
+    DateTime at,
+    CancellationToken ct)
+    {
+        var productIds = items.Select(i => i.ProductId).Distinct().ToList();
+
+        // lấy salePrice hiện tại của product
+        var priceMap = await _db.Products
+            .AsNoTracking()
+            .Where(p => productIds.Contains(p.ProductId))
+            .Select(p => new { p.ProductId, p.SalePrice })
+            .ToDictionaryAsync(x => x.ProductId, x => x.SalePrice, ct);
+
+        // best discount hiện tại (active tại thời điểm at)
+        var discountMap = await GetBestDiscountMapAsync(productIds, at, ct);
+
+        foreach (var item in items)
+        {
+            if (!priceMap.TryGetValue(item.ProductId, out var salePriceNow))
+                throw new Exception($"Product {item.ProductId} not found.");
+
+            // suy ra: order này "đang dùng promotion" nếu unitPrice thấp hơn salePrice hiện tại
+            var hadDiscount = item.UnitPrice < salePriceNow;
+            if (!hadDiscount) continue;
+
+            var bestPct = discountMap.TryGetValue(item.ProductId, out var best) ? best : 0;
+            if (bestPct <= 0)
+                throw new Exception($"Promotion expired for productId={item.ProductId}. Cannot pay.");
+
+            var expectedUnit = MyShopServer.Application.Common.PriceCalc.ApplyDiscount(salePriceNow, bestPct);
+
+            if (expectedUnit != item.UnitPrice)
+                throw new Exception(
+                    $"Promotion changed for productId={item.ProductId}. " +
+                    $"Expected unitPrice={expectedUnit} but order has unitPrice={item.UnitPrice}. Cannot pay.");
+        }
+    }
+
+
     // ==========================
     // CREATE
     // ==========================
@@ -128,14 +168,28 @@ public class OrderService : IOrderService
             .Include(o => o.Sale)
             .SingleOrDefaultAsync(o => o.OrderId == orderId, ct);
 
+
         if (order == null)
             throw new Exception("Order not found");
+
+        // Nếu đổi sang Paid: chỉ cho phép từ Created và phải check promotion còn hiệu lực (nếu order đang hưởng giảm)
+        if (dto.Status.HasValue && dto.Status.Value == OrderStatus.Paid)
+        {
+            if (order.Status != OrderStatus.Created)
+                throw new Exception("Only Created orders can be paid.");
+
+            // không cho sửa items trong lúc pay (optional nhưng hợp lý)
+            // nếu bạn vẫn cho sửa items, thì kiểm tra sau khi replace items
+            var at = DateTime.UtcNow;
+            await EnsurePromotionStillValidWhenPayAsync(order.Items.ToList(), at, ct);
+        }
+
 
         // Cập nhật customer
         if (dto.CustomerId.HasValue)
         {
             // hoặc check customer có tồn tại không nếu cần
-            order.CustomerId = dto.CustomerId;
+            order.CustomerId = dto.CustomerId.Value;
         }
 
         // Cập nhật status
