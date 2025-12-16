@@ -4,16 +4,42 @@ using MyShopServer.DTOs.Common;
 using MyShopServer.DTOs.Orders;
 using MyShopServer.Domain.Enums;
 using MyShopServer.Infrastructure.Data;
+using MyShopServer.Application.Common;
 
 namespace MyShopServer.Application.Services.Implementations;
 
 public class OrderService : IOrderService
 {
     private readonly AppDbContext _db;
+    private readonly IPromotionService _promotion;
 
-    public OrderService(AppDbContext db)
+    public OrderService(AppDbContext db, IPromotionService promotion)
     {
         _db = db;
+        _promotion = promotion;
+    }
+
+    private async Task<Dictionary<int, int>> GetBestDiscountMapAsync(
+    IReadOnlyCollection<int> productIds,
+    DateTime at,
+    CancellationToken ct)
+    {
+        if (productIds.Count == 0) return new Dictionary<int, int>();
+
+        return await _db.ProductPromotions
+            .AsNoTracking()
+            .Where(pp => productIds.Contains(pp.ProductId))
+            .Select(pp => new
+            {
+                pp.ProductId,
+                pp.Promotion.DiscountPercent,
+                pp.Promotion.StartDate,
+                pp.Promotion.EndDate
+            })
+            .Where(x => x.StartDate <= at && at <= x.EndDate)
+            .GroupBy(x => x.ProductId)
+            .Select(g => new { ProductId = g.Key, Best = g.Max(t => t.DiscountPercent) })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Best, ct);
     }
 
     // ==========================
@@ -43,6 +69,9 @@ public class OrderService : IOrderService
             .Where(p => productIds.Contains(p.ProductId))
             .ToListAsync(ct);
 
+        var at = DateTime.UtcNow;
+        var discountMap = await GetBestDiscountMapAsync(productIds, at, ct);
+
         if (products.Count != productIds.Count)
         {
             throw new Exception("Some products in the order do not exist.");
@@ -63,7 +92,8 @@ public class OrderService : IOrderService
         foreach (var i in dto.Items)
         {
             var product = products.Single(p => p.ProductId == i.ProductId);
-            var unitPrice = product.SalePrice;
+            var pct = discountMap.TryGetValue(product.ProductId, out var best) ? best : 0;
+            var unitPrice = PriceCalc.ApplyDiscount(product.SalePrice, pct);
             var lineTotal = unitPrice * i.Quantity;
 
             total += lineTotal;
@@ -130,6 +160,9 @@ public class OrderService : IOrderService
                 .Where(p => productIds.Contains(p.ProductId))
                 .ToListAsync(ct);
 
+            var at = DateTime.UtcNow;
+            var discountMap = await GetBestDiscountMapAsync(productIds, at, ct);
+
             if (products.Count != productIds.Count)
                 throw new Exception("Some products in the order do not exist.");
 
@@ -139,7 +172,8 @@ public class OrderService : IOrderService
             foreach (var i in dto.Items)
             {
                 var product = products.Single(p => p.ProductId == i.ProductId);
-                var unitPrice = product.SalePrice;
+                var pct = discountMap.TryGetValue(product.ProductId, out var best) ? best : 0;
+                var unitPrice = PriceCalc.ApplyDiscount(product.SalePrice, pct);
                 var lineTotal = unitPrice * i.Quantity;
                 total += lineTotal;
 

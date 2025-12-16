@@ -12,4 +12,9 @@ public class ProductDetailDto
     public int CategoryId { get; set; }
     public string CategoryName { get; set; } = default!;
     public List<string> ImagePaths { get; set; } = new();
+
+    public int DiscountPct { get; set; }
+    public int FinalPrice { get; set; }
+
+
 }
