@@ -10,10 +10,35 @@ namespace MyShopServer.Application.Services.Implementations;
 public class ProductService : IProductService
 {
     private readonly AppDbContext _db;
+    private readonly IPromotionService _promotion;
 
-    public ProductService(AppDbContext db)
+    public ProductService(AppDbContext db, IPromotionService promotion)
     {
         _db = db;
+        _promotion = promotion;
+    }
+
+    private async Task<Dictionary<int, int>> GetBestDiscountMapAsync(
+    IReadOnlyCollection<int> productIds,
+    DateTime at,
+    CancellationToken ct)
+    {
+        if (productIds.Count == 0) return new Dictionary<int, int>();
+
+        return await _db.ProductPromotions
+            .AsNoTracking()
+            .Where(pp => productIds.Contains(pp.ProductId))
+            .Select(pp => new
+            {
+                pp.ProductId,
+                pp.Promotion.DiscountPercent,
+                pp.Promotion.StartDate,
+                pp.Promotion.EndDate
+            })
+            .Where(x => x.StartDate <= at && at <= x.EndDate)
+            .GroupBy(x => x.ProductId)
+            .Select(g => new { ProductId = g.Key, Best = g.Max(t => t.DiscountPercent) })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Best, ct);
     }
 
     public async Task<PagedResult<ProductListItemDto>> GetProductsAsync(
@@ -75,6 +100,18 @@ public class ProductService : IProductService
                     CategoryName = p.Category!.Name
                 })
                 .ToListAsync(ct);
+
+            var now = DateTime.UtcNow;
+            var ids = items.Select(x => x.ProductId).ToList();
+            var discountMap = await GetBestDiscountMapAsync(ids, now, ct);
+
+            foreach (var p in items)
+            {
+                var pct = discountMap.TryGetValue(p.ProductId, out var best) ? best : 0;
+                p.DiscountPct = pct;
+                p.FinalPrice = PriceCalc.ApplyDiscount(p.SalePrice, pct);
+            }
+
 
             return new PagedResult<ProductListItemDto>
             {
@@ -146,6 +183,18 @@ public class ProductService : IProductService
             })
             .ToList();
 
+        var now2 = DateTime.UtcNow;
+        var ids2 = items2.Select(x => x.ProductId).ToList();
+        var discountMap2 = await GetBestDiscountMapAsync(ids2, now2, ct);
+
+        foreach (var p in items2)
+        {
+            var pct = discountMap2.TryGetValue(p.ProductId, out var best) ? best : 0;
+            p.DiscountPct = pct;
+            p.FinalPrice = PriceCalc.ApplyDiscount(p.SalePrice, pct);
+        }
+
+
         return new PagedResult<ProductListItemDto>
         {
             Items = items2,
@@ -167,6 +216,12 @@ public class ProductService : IProductService
         if (product == null)
             return null;
 
+
+        var now = DateTime.UtcNow;
+        var discountMap = await GetBestDiscountMapAsync(new[] { product.ProductId }, now, ct);
+        var pct = discountMap.TryGetValue(product.ProductId, out var best) ? best : 0;
+        var final = MyShopServer.Application.Common.PriceCalc.ApplyDiscount(product.SalePrice, pct);
+
         return new ProductDetailDto
         {
             ProductId = product.ProductId,
@@ -174,12 +229,15 @@ public class ProductService : IProductService
             Name = product.Name,
             ImportPrice = product.ImportPrice,
             SalePrice = product.SalePrice,
+            DiscountPct = pct,
+            FinalPrice = final,
             StockQuantity = product.StockQuantity,
             Description = product.Description,
             CategoryId = product.CategoryId,
             CategoryName = product.Category?.Name ?? string.Empty,
             ImagePaths = product.Images.Select(i => i.ImagePath).ToList()
         };
+
     }
 
     public async Task<ProductDetailDto> CreateProductAsync(
