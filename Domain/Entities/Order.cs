@@ -19,4 +19,6 @@ public class Order
     public ICollection<Payment> Payments { get; set; }
     public Customer? Customer { get; set; }
 
+    public ICollection<OrderPromotion> OrderPromotions { get; set; } = new List<OrderPromotion>();
+
 }

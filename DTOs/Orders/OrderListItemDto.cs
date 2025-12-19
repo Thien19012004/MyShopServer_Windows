@@ -11,4 +11,7 @@ public class OrderListItemDto
     public int TotalPrice { get; set; }
     public DateTime CreatedAt { get; set; }
     public int ItemsCount { get; set; }
+
+    // New: pricing breakdown (best-effort)
+    public int OrderDiscountAmount { get; set; }
 }

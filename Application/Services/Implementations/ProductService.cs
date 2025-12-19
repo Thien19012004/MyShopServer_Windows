@@ -25,20 +25,80 @@ public class ProductService : IProductService
     {
         if (productIds.Count == 0) return new Dictionary<int, int>();
 
-        return await _db.ProductPromotions
+        // Get category IDs for the products
+    var productCategoryMap = await _db.Products
             .AsNoTracking()
-            .Where(pp => productIds.Contains(pp.ProductId))
+            .Where(p => productIds.Contains(p.ProductId))
+            .ToDictionaryAsync(p => p.ProductId, p => p.CategoryId, ct);
+
+     var categoryIds = productCategoryMap.Values.Distinct().ToList();
+
+        // Get Product-level promotions
+        var productPromotions = await _db.ProductPromotions
+   .AsNoTracking()
+            .Include(pp => pp.Promotion)
+ .Where(pp => productIds.Contains(pp.ProductId))
+            .Where(pp => pp.Promotion.StartDate <= at && at <= pp.Promotion.EndDate && pp.Promotion.Scope == Domain.Enums.PromotionScope.Product)
             .Select(pp => new
-            {
-                pp.ProductId,
-                pp.Promotion.DiscountPercent,
-                pp.Promotion.StartDate,
-                pp.Promotion.EndDate
+  {
+        pp.ProductId,
+         pp.Promotion.DiscountPercent
+   })
+  .ToListAsync(ct);
+
+        // Get Category-level promotions
+        var categoryPromotions = await _db.CategoryPromotions
+  .AsNoTracking()
+       .Include(cp => cp.Promotion)
+            .Where(cp => categoryIds.Contains(cp.CategoryId))
+            .Where(cp => cp.Promotion.StartDate <= at && at <= cp.Promotion.EndDate && cp.Promotion.Scope == Domain.Enums.PromotionScope.Category)
+        .Select(cp => new
+       {
+      cp.CategoryId,
+   cp.Promotion.DiscountPercent
             })
-            .Where(x => x.StartDate <= at && at <= x.EndDate)
-            .GroupBy(x => x.ProductId)
-            .Select(g => new { ProductId = g.Key, Best = g.Max(t => t.DiscountPercent) })
-            .ToDictionaryAsync(x => x.ProductId, x => x.Best, ct);
+            .ToListAsync(ct);
+
+      // Build result dictionary with best discount for each product
+        var result = new Dictionary<int, int>();
+
+        foreach (var productId in productIds)
+        {
+          var bestDiscount = 0;
+
+      // Check product-level promotions
+ var productDiscounts = productPromotions
+      .Where(p => p.ProductId == productId)
+     .Select(p => p.DiscountPercent);
+
+          foreach (var discount in productDiscounts)
+  {
+          if (discount > bestDiscount)
+             bestDiscount = discount;
+     }
+
+      // Check category-level promotions
+            if (productCategoryMap.TryGetValue(productId, out var categoryId))
+            {
+ var categoryDiscounts = categoryPromotions
+       .Where(c => c.CategoryId == categoryId)
+                    .Select(c => c.DiscountPercent);
+
+         foreach (var discount in categoryDiscounts)
+     {
+ if (discount > bestDiscount)
+          bestDiscount = discount;
+          }
+}
+
+      // Only add to result if there's a discount
+    if (bestDiscount > 0)
+ {
+      result[productId] = bestDiscount;
+        }
+        }
+
+  return result;
     }
 
     public async Task<PagedResult<ProductListItemDto>> GetProductsAsync(
@@ -220,7 +280,7 @@ public class ProductService : IProductService
         var now = DateTime.UtcNow;
         var discountMap = await GetBestDiscountMapAsync(new[] { product.ProductId }, now, ct);
         var pct = discountMap.TryGetValue(product.ProductId, out var best) ? best : 0;
-        var final = MyShopServer.Application.Common.PriceCalc.ApplyDiscount(product.SalePrice, pct);
+        var final = PriceCalc.ApplyDiscount(product.SalePrice, pct);
 
         return new ProductDetailDto
         {

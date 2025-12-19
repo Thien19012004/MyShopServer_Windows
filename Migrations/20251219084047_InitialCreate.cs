@@ -62,7 +62,8 @@ namespace MyShopServer.Migrations
                     Name = table.Column<string>(type: "TEXT", maxLength: 150, nullable: false),
                     DiscountPercent = table.Column<int>(type: "INTEGER", nullable: false),
                     StartDate = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    EndDate = table.Column<DateTime>(type: "TEXT", nullable: false)
+                    EndDate = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    Scope = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -123,6 +124,30 @@ namespace MyShopServer.Migrations
                         principalTable: "Categories",
                         principalColumn: "CategoryId",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "CategoryPromotions",
+                columns: table => new
+                {
+                    CategoryId = table.Column<int>(type: "INTEGER", nullable: false),
+                    PromotionId = table.Column<int>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CategoryPromotions", x => new { x.CategoryId, x.PromotionId });
+                    table.ForeignKey(
+                        name: "FK_CategoryPromotions_Categories_CategoryId",
+                        column: x => x.CategoryId,
+                        principalTable: "Categories",
+                        principalColumn: "CategoryId",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_CategoryPromotions_Promotions_PromotionId",
+                        column: x => x.PromotionId,
+                        principalTable: "Promotions",
+                        principalColumn: "PromotionId",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -301,6 +326,30 @@ namespace MyShopServer.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "OrderPromotions",
+                columns: table => new
+                {
+                    OrderId = table.Column<int>(type: "INTEGER", nullable: false),
+                    PromotionId = table.Column<int>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_OrderPromotions", x => new { x.OrderId, x.PromotionId });
+                    table.ForeignKey(
+                        name: "FK_OrderPromotions_Orders_OrderId",
+                        column: x => x.OrderId,
+                        principalTable: "Orders",
+                        principalColumn: "OrderId",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_OrderPromotions_Promotions_PromotionId",
+                        column: x => x.PromotionId,
+                        principalTable: "Promotions",
+                        principalColumn: "PromotionId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Payments",
                 columns: table => new
                 {
@@ -328,6 +377,11 @@ namespace MyShopServer.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_CategoryPromotions_PromotionId",
+                table: "CategoryPromotions",
+                column: "PromotionId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Commissions_OrderId",
                 table: "Commissions",
                 column: "OrderId",
@@ -347,6 +401,11 @@ namespace MyShopServer.Migrations
                 name: "IX_OrderItems_ProductId",
                 table: "OrderItems",
                 column: "ProductId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_OrderPromotions_PromotionId",
+                table: "OrderPromotions",
+                column: "PromotionId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Orders_CustomerId",
@@ -406,10 +465,16 @@ namespace MyShopServer.Migrations
                 name: "AuditLogs");
 
             migrationBuilder.DropTable(
+                name: "CategoryPromotions");
+
+            migrationBuilder.DropTable(
                 name: "Commissions");
 
             migrationBuilder.DropTable(
                 name: "OrderItems");
+
+            migrationBuilder.DropTable(
+                name: "OrderPromotions");
 
             migrationBuilder.DropTable(
                 name: "Payments");

@@ -1,4 +1,6 @@
-﻿namespace MyShopServer.Application.GraphQL.Inputs.Promotions;
+﻿using MyShopServer.Domain.Enums;
+
+namespace MyShopServer.Application.GraphQL.Inputs.Promotions;
 
 public class PromotionFilterInput
 {
@@ -7,4 +9,7 @@ public class PromotionFilterInput
 
     // thời điểm để check active; null => now
     public DateTime? At { get; set; }
+    
+    // Filter by promotion scope (PRODUCT, CATEGORY, ORDER)
+    public PromotionScope? Scope { get; set; }
 }

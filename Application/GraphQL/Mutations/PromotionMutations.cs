@@ -24,7 +24,9 @@ public class PromotionMutations
                 DiscountPercent = input.DiscountPercent,
                 StartDate = input.StartDate,
                 EndDate = input.EndDate,
-                ProductIds = input.ProductIds ?? new()
+                Scope = input.Scope,
+                ProductIds = input.ProductIds ?? new(),
+                CategoryIds = input.CategoryIds ?? new()
             };
 
             var created = await promotionService.CreatePromotionAsync(dto, ct);
@@ -79,7 +81,9 @@ public class PromotionMutations
                 DiscountPercent = input.DiscountPercent ?? existing.DiscountPercent,
                 StartDate = input.StartDate ?? existing.StartDate,
                 EndDate = input.EndDate ?? existing.EndDate,
-                ProductIds = input.ProductIds ?? existing.ProductIds
+                Scope = input.Scope ?? existing.Scope,
+                ProductIds = input.ProductIds ?? existing.ProductIds,
+                CategoryIds = input.CategoryIds ?? existing.CategoryIds
             };
 
             var updated = await promotionService.UpdatePromotionAsync(promotionId, dto, replaceProducts, ct);

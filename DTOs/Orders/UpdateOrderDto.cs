@@ -8,6 +8,7 @@ public class UpdateOrderDto
     public OrderStatus? Status { get; set; }
     // nếu null => giữ nguyên items, nếu có => replace toàn bộ items
     public List<UpdateOrderItemDto>? Items { get; set; }
+    public List<int>? PromotionIds { get; set; }
 }
 
 public class UpdateOrderItemDto

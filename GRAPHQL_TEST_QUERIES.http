@@ -1,0 +1,286 @@
+﻿### ============================================
+### GRAPHQL_TEST_QUERIES.http (PROMOTIONS + ORDERS)
+### ============================================
+
+@host = https://localhost:5135
+@token = YOUR_JWT_TOKEN_HERE
+
+@page = 1
+@pageSize = 20
+
+# Example IDs (edit)
+@promotionId = 1
+@orderId = 1
+
+### ------------------------------------------------
+### PROMOTIONS
+### ------------------------------------------------
+
+### 1) Create PRODUCT promotion (requires productIds)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($input: CreatePromotionInput!) { createPromotion(input: $input) { success statusCode message data { promotionId name discountPercent startDate endDate scope productIds categoryIds } } }",
+  "variables": {
+    "input": {
+      "name": "Product -15%",
+      "discountPercent": 15,
+      "startDate": "2025-12-19T00:00:00Z",
+      "endDate": "2025-12-31T23:59:59Z",
+      "scope": "PRODUCT",
+      "productIds": [1,2]
+    }
+  }
+}
+
+### 2) Create CATEGORY promotion (requires categoryIds)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($input: CreatePromotionInput!) { createPromotion(input: $input) { success statusCode message data { promotionId name discountPercent startDate endDate scope productIds categoryIds } } }",
+  "variables": {
+    "input": {
+      "name": "Category -10%",
+      "discountPercent": 10,
+      "startDate": "2025-12-19T00:00:00Z",
+      "endDate": "2025-12-31T23:59:59Z",
+      "scope": "CATEGORY",
+      "categoryIds": [1]
+    }
+  }
+}
+
+### 3) Create ORDER promotion (no productIds/categoryIds)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($input: CreatePromotionInput!) { createPromotion(input: $input) { success statusCode message data { promotionId name discountPercent startDate endDate scope } } }",
+  "variables": {
+    "input": {
+      "name": "Order -5%",
+      "discountPercent": 5,
+      "startDate": "2025-12-19T00:00:00Z",
+      "endDate": "2025-12-31T23:59:59Z",
+      "scope": "ORDER"
+    }
+  }
+}
+
+### 4) List promotions (FE: scope + onlyActive + paging)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "query($pagination: PaginationInput, $filter: PromotionFilterInput) { promotions(pagination: $pagination, filter: $filter) { statusCode success message data { page pageSize totalItems totalPages items { promotionId name discountPercent startDate endDate scope productIds categoryIds } } } }",
+  "variables": {
+    "pagination": { "page": {{page}}, "pageSize": {{pageSize}} },
+    "filter": { "scope": null, "onlyActive": false }
+  }
+}
+
+### 5) List promotions - only ACTIVE ORDER (FE chọn promotion cho Order)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "query($pagination: PaginationInput, $filter: PromotionFilterInput) { promotions(pagination: $pagination, filter: $filter) { statusCode success message data { page pageSize totalItems totalPages items { promotionId name discountPercent startDate endDate scope } } } }",
+  "variables": {
+    "pagination": { "page": 1, "pageSize": 50 },
+    "filter": { "scope": "ORDER", "onlyActive": true }
+  }
+}
+
+### 6) Promotion by id
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "query($id: Int!) { promotionById(promotionId: $id) { statusCode success message data { promotionId name discountPercent startDate endDate scope productIds categoryIds } } }",
+  "variables": { "id": {{promotionId}} }
+}
+
+### 7) Update promotion (only when NOT active)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($id: Int!, $input: UpdatePromotionInput!) { updatePromotion(promotionId: $id, input: $input) { success statusCode message data { promotionId name discountPercent startDate endDate scope productIds categoryIds } } }",
+  "variables": {
+    "id": {{promotionId}},
+    "input": {
+      "name": "Order -7% (updated)",
+      "discountPercent": 7,
+      "startDate": "2026-01-01T00:00:00Z",
+      "endDate": "2026-01-31T23:59:59Z",
+      "scope": "ORDER"
+    }
+  }
+}
+
+### 8) Delete promotion
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($id: Int!) { deletePromotion(promotionId: $id) { success statusCode message } }",
+  "variables": { "id": {{promotionId}} }
+}
+
+### ------------------------------------------------
+### ORDERS
+### ------------------------------------------------
+
+### 9) Create order (promotionIds: ONLY ORDER-scope)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($input: CreateOrderInput!) { createOrder(input: $input) { success statusCode message data { orderId status createdAt subtotal orderDiscountAmount totalPrice promotionIds items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
+  "variables": {
+    "input": {
+      "customerId": 1,
+      "saleId": 3,
+      "promotionIds": [7],
+      "items": [
+        { "productId": 1, "quantity": 2 },
+        { "productId": 2, "quantity": 1 }
+      ]
+    }
+  }
+}
+
+### 10) List orders (Order list screen)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "query($pagination: PaginationInput, $filter: OrderFilterInput, $dateRange: DateRangeInput) { orders(pagination: $pagination, filter: $filter, dateRange: $dateRange) { statusCode success message data { page pageSize totalItems totalPages items { orderId status createdAt customerName saleName subtotal orderDiscountAmount totalPrice itemsCount } } } }",
+  "variables": {
+    "pagination": { "page": {{page}}, "pageSize": {{pageSize}} },
+    "filter": null,
+    "dateRange": null
+  }
+}
+
+### 11) Order by id (detail screen)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "query($id: Int!) { orderById(orderId: $id) { statusCode success message data { orderId status createdAt customerId customerName customerPhone saleId saleName subtotal orderDiscountAmount totalPrice promotionIds items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
+  "variables": { "id": {{orderId}} }
+}
+
+### 12) Update order - replace promotions ONLY
+### - empty array [] => remove all promotions
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status subtotal orderDiscountAmount totalPrice promotionIds } } }",
+  "variables": {
+    "id": {{orderId}},
+    "input": {
+      "promotionIds": [7]
+    }
+  }
+}
+
+### 13) Update order - remove all promotions
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status subtotal orderDiscountAmount totalPrice promotionIds } } }",
+  "variables": {
+    "id": {{orderId}},
+    "input": {
+      "promotionIds": []
+    }
+  }
+}
+
+### 14) Update order - replace items ONLY
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status subtotal orderDiscountAmount totalPrice promotionIds items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
+  "variables": {
+    "id": {{orderId}},
+    "input": {
+      "items": [
+        { "productId": 1, "quantity": 1 }
+      ]
+    }
+  }
+}
+
+### 15) Update order - replace BOTH items + promotions
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status subtotal orderDiscountAmount totalPrice promotionIds items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
+  "variables": {
+    "id": {{orderId}},
+    "input": {
+      "promotionIds": [7],
+      "items": [
+        { "productId": 1, "quantity": 2 },
+        { "productId": 2, "quantity": 1 }
+      ]
+    }
+  }
+}
+
+### 16) Mark order as PAID
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($id: Int!) { updateOrder(orderId: $id, input: { status: PAID }) { success statusCode message data { orderId status totalPrice } } }",
+  "variables": { "id": {{orderId}} }
+}
+
+### 17) Try update Paid order (should fail)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status totalPrice } } }",
+  "variables": {
+    "id": {{orderId}},
+    "input": { "promotionIds": [] }
+  }
+}
+
+### 18) Delete order
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($id: Int!) { deleteOrder(orderId: $id) { success statusCode message } }",
+  "variables": { "id": {{orderId}} }
+}

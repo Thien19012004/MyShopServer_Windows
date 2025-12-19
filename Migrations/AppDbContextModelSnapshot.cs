@@ -79,6 +79,21 @@ namespace MyShopServer.Migrations
                     b.ToTable("Categories", (string)null);
                 });
 
+            modelBuilder.Entity("MyShopServer.Domain.Entities.CategoryPromotion", b =>
+                {
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PromotionId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("CategoryId", "PromotionId");
+
+                    b.HasIndex("PromotionId");
+
+                    b.ToTable("CategoryPromotions", (string)null);
+                });
+
             modelBuilder.Entity("MyShopServer.Domain.Entities.Commission", b =>
                 {
                     b.Property<int>("CommissionId")
@@ -199,6 +214,21 @@ namespace MyShopServer.Migrations
                     b.HasIndex("ProductId");
 
                     b.ToTable("OrderItems", (string)null);
+                });
+
+            modelBuilder.Entity("MyShopServer.Domain.Entities.OrderPromotion", b =>
+                {
+                    b.Property<int>("OrderId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PromotionId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("OrderId", "PromotionId");
+
+                    b.HasIndex("PromotionId");
+
+                    b.ToTable("OrderPromotions", (string)null);
                 });
 
             modelBuilder.Entity("MyShopServer.Domain.Entities.Payment", b =>
@@ -332,6 +362,11 @@ namespace MyShopServer.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("TEXT");
 
@@ -421,6 +456,25 @@ namespace MyShopServer.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("MyShopServer.Domain.Entities.CategoryPromotion", b =>
+                {
+                    b.HasOne("MyShopServer.Domain.Entities.Category", "Category")
+                        .WithMany("CategoryPromotions")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MyShopServer.Domain.Entities.Promotion", "Promotion")
+                        .WithMany("CategoryPromotions")
+                        .HasForeignKey("PromotionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("Promotion");
+                });
+
             modelBuilder.Entity("MyShopServer.Domain.Entities.Commission", b =>
                 {
                     b.HasOne("MyShopServer.Domain.Entities.Order", "Order")
@@ -475,6 +529,25 @@ namespace MyShopServer.Migrations
                     b.Navigation("Order");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("MyShopServer.Domain.Entities.OrderPromotion", b =>
+                {
+                    b.HasOne("MyShopServer.Domain.Entities.Order", "Order")
+                        .WithMany("OrderPromotions")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MyShopServer.Domain.Entities.Promotion", "Promotion")
+                        .WithMany("OrderPromotions")
+                        .HasForeignKey("PromotionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+
+                    b.Navigation("Promotion");
                 });
 
             modelBuilder.Entity("MyShopServer.Domain.Entities.Payment", b =>
@@ -550,6 +623,8 @@ namespace MyShopServer.Migrations
 
             modelBuilder.Entity("MyShopServer.Domain.Entities.Category", b =>
                 {
+                    b.Navigation("CategoryPromotions");
+
                     b.Navigation("Products");
                 });
 
@@ -561,6 +636,8 @@ namespace MyShopServer.Migrations
             modelBuilder.Entity("MyShopServer.Domain.Entities.Order", b =>
                 {
                     b.Navigation("Items");
+
+                    b.Navigation("OrderPromotions");
 
                     b.Navigation("Payments");
                 });
@@ -576,6 +653,10 @@ namespace MyShopServer.Migrations
 
             modelBuilder.Entity("MyShopServer.Domain.Entities.Promotion", b =>
                 {
+                    b.Navigation("CategoryPromotions");
+
+                    b.Navigation("OrderPromotions");
+
                     b.Navigation("ProductPromotions");
                 });
 

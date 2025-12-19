@@ -1,4 +1,6 @@
-﻿namespace MyShopServer.Application.GraphQL.Inputs.Promotions;
+﻿using MyShopServer.Domain.Enums;
+
+namespace MyShopServer.Application.GraphQL.Inputs.Promotions;
 
 public class CreatePromotionInput
 {
@@ -7,6 +9,11 @@ public class CreatePromotionInput
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
 
-    // gán sản phẩm được áp dụng (optional)
+    public PromotionScope Scope { get; set; }
+
+    // For Product scope
     public List<int>? ProductIds { get; set; }
+    
+    // For Category scope
+    public List<int>? CategoryIds { get; set; }
 }

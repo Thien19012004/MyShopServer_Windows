@@ -25,7 +25,8 @@ public class PromotionQueries
                 PageSize = pagination?.PageSize ?? 10,
                 Search = filter?.Search,
                 OnlyActive = filter?.OnlyActive ?? false,
-                At = filter?.At
+                At = filter?.At,
+                Scope = filter?.Scope // Add scope filter
             };
 
             var paged = await promotionService.GetPromotionsAsync(opt, ct);
