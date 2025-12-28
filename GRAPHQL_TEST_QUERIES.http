@@ -147,7 +147,7 @@ Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($input: CreateOrderInput!) { createOrder(input: $input) { success statusCode message data { orderId status createdAt subtotal orderDiscountAmount totalPrice promotionIds items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
+  "query": "mutation($input: CreateOrderInput!) { createOrder(input: $input) { success statusCode message data { orderId status totalPrice subtotal orderDiscountAmount orderDiscountPercentApplied promotionIds createdAt items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
   "variables": {
     "input": {
       "customerId": 1,
@@ -181,7 +181,7 @@ Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "query($id: Int!) { orderById(orderId: $id) { statusCode success message data { orderId status createdAt customerId customerName customerPhone saleId saleName subtotal orderDiscountAmount totalPrice promotionIds items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
+  "query": "query($id: Int!) { orderById(orderId: $id) { statusCode success message data { orderId status totalPrice subtotal orderDiscountAmount orderDiscountPercentApplied promotionIds customerId customerName saleId saleName createdAt items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
   "variables": { "id": {{orderId}} }
 }
 
@@ -196,7 +196,7 @@ Authorization: Bearer {{token}}
   "variables": {
     "id": {{orderId}},
     "input": {
-      "promotionIds": [7]
+    "promotionIds": [7]
     }
   }
 }
@@ -209,7 +209,7 @@ Authorization: Bearer {{token}}
 {
   "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status subtotal orderDiscountAmount totalPrice promotionIds } } }",
   "variables": {
-    "id": {{orderId}},
+ "id": {{orderId}},
     "input": {
       "promotionIds": []
     }
@@ -227,9 +227,9 @@ Authorization: Bearer {{token}}
     "id": {{orderId}},
     "input": {
       "items": [
-        { "productId": 1, "quantity": 1 }
+     { "productId": 1, "quantity": 1 }
       ]
-    }
+ }
   }
 }
 
@@ -243,9 +243,9 @@ Authorization: Bearer {{token}}
   "variables": {
     "id": {{orderId}},
     "input": {
-      "promotionIds": [7],
+   "promotionIds": [7],
       "items": [
-        { "productId": 1, "quantity": 2 },
+   { "productId": 1, "quantity": 2 },
         { "productId": 2, "quantity": 1 }
       ]
     }

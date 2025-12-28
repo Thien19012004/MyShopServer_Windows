@@ -11,7 +11,7 @@ using MyShopServer.Infrastructure.Data;
 namespace MyShopServer.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251219084047_InitialCreate")]
+    [Migration("20251228131612_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />

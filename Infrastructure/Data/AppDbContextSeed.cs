@@ -512,8 +512,7 @@ new ProductPromotion { ProductId = 45, PromotionId = 2 }, // Sony WH-1000XM5 Đe
 
         var order1Promotions = new[]
         {
-            new OrderPromotion { OrderId = 1, PromotionId = 1 }, // Product promotion
-     new OrderPromotion { OrderId = 1, PromotionId = 7 }, // Order promotion 5%
+    new OrderPromotion { OrderId = 1, PromotionId = 7 }, // Order promotion 5%
         };
 
         var payment1 = new Payment
@@ -561,10 +560,7 @@ new ProductPromotion { ProductId = 45, PromotionId = 2 }, // Sony WH-1000XM5 Đe
 
         order2.TotalPrice = 26391200;
 
-        var order2Promotions = new[]
-        {
-     new OrderPromotion { OrderId = 2, PromotionId = 4 }, // Category promotion Laptop
-   };
+        OrderPromotion[] order2Promotions = Array.Empty<OrderPromotion>();
 
         var payment2 = new Payment
         {
@@ -625,10 +621,8 @@ new ProductPromotion { ProductId = 45, PromotionId = 2 }, // Sony WH-1000XM5 Đe
         order3.TotalPrice = 10886040;
 
         var order3Promotions = new[]
-             {
-       new OrderPromotion { OrderId = 3, PromotionId = 2 }, // Product promotion tai nghe
-            new OrderPromotion { OrderId = 3, PromotionId = 5 }, // Category promotion âm thanh
-    new OrderPromotion { OrderId = 3, PromotionId = 8 }, // Order promotion 10%
+     {
+      new OrderPromotion { OrderId = 3, PromotionId = 8 }, // Order promotion 10%
   };
 
         // Order 4: Đã hủy

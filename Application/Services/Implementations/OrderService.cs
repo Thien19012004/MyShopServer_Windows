@@ -415,25 +415,67 @@ public class OrderService : IOrderService
     {
         var order = await _db.Orders
             .AsNoTracking()
-            .Include(o => o.Items).ThenInclude(i => i.Product)
-            .Include(o => o.Customer)
-            .Include(o => o.Sale)
-            .Include(o => o.OrderPromotions)
-            .SingleOrDefaultAsync(o => o.OrderId == orderId, ct);
+       .Include(o => o.Items).ThenInclude(i => i.Product)
+      .Include(o => o.Customer)
+        .Include(o => o.Sale)
+ .Include(o => o.OrderPromotions)
+         .SingleOrDefaultAsync(o => o.OrderId == orderId, ct);
 
         if (order == null) return null;
 
         var subtotal = order.Items.Sum(i => i.TotalPrice);
 
-        // ✅ Make these fields ALWAYS consistent with stored TotalPrice
+        // Make these fields ALWAYS consistent with stored TotalPrice
         var discountAmount = Math.Clamp(subtotal - order.TotalPrice, 0, subtotal);
 
         // percent derived from actual stored discount (rounded)
         var discountPercent = subtotal <= 0
-            ? 0
-            : (int)Math.Round(discountAmount * 100.0 / subtotal);
+     ? 0
+        : (int)Math.Round(discountAmount * 100.0 / subtotal);
 
-        var promoIds = order.OrderPromotions.Select(op => op.PromotionId).Distinct().ToList();
+        // Order-scope promotion IDs (from OrderPromotions table)
+        var orderPromoIds = order.OrderPromotions.Select(op => op.PromotionId).Distinct().ToList();
+
+        // Get all Product/Category-scope promotions that were applied to items
+        var productIds = order.Items.Select(i => i.ProductId).Distinct().ToList();
+        var at = order.CreatedAt; // Use order creation time to get promotions active at that time
+
+        // Get Product-scope promotions
+        var productPromoIds = await _db.ProductPromotions
+            .AsNoTracking()
+            .Where(pp => productIds.Contains(pp.ProductId))
+            .Where(pp =>
+            pp.Promotion.Scope == PromotionScope.Product &&
+            pp.Promotion.StartDate <= at && at <= pp.Promotion.EndDate)
+            .Select(pp => pp.Promotion.PromotionId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        // Get Category-scope promotions
+        var categoryIds = await _db.Products
+            .AsNoTracking()
+            .Where(p => productIds.Contains(p.ProductId))
+            .Select(p => p.CategoryId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var categoryPromoIds = await _db.CategoryPromotions
+            .AsNoTracking()
+            .Where(cp => categoryIds.Contains(cp.CategoryId))
+            .Where(cp =>
+            cp.Promotion.Scope == PromotionScope.Category &&
+            cp.Promotion.StartDate <= at && at <= cp.Promotion.EndDate)
+            .Select(cp => cp.Promotion.PromotionId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        // Merge all promotion IDs: Order + Product + Category
+        var allPromotionIds = orderPromoIds
+            .Concat(productPromoIds)
+            .Concat(categoryPromoIds)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
 
         return new OrderDetailDto
         {
@@ -447,7 +489,7 @@ public class OrderService : IOrderService
             TotalPrice = order.TotalPrice,
             CreatedAt = order.CreatedAt,
             Items = order.Items
-                .OrderBy(i => i.OrderItemId)
+            .OrderBy(i => i.OrderItemId)
                 .Select(i => new OrderItemDto
                 {
                     OrderItemId = i.OrderItemId,
@@ -459,7 +501,7 @@ public class OrderService : IOrderService
                 })
                 .ToList(),
 
-            PromotionIds = promoIds,
+            PromotionIds = allPromotionIds, // All applied: Order + Product + Category
             Subtotal = subtotal,
             OrderDiscountAmount = discountAmount,
             OrderDiscountPercentApplied = discountPercent
@@ -526,6 +568,7 @@ public class OrderService : IOrderService
                 TotalPrice = o.TotalPrice,
                 CreatedAt = o.CreatedAt,
                 ItemsCount = o.Items.Count,
+                Subtotal = subtotal,
                 OrderDiscountAmount = discount
             };
         }).ToList();
