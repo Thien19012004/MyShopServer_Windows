@@ -11,4 +11,8 @@ public class OrderListItemDto
     public int TotalPrice { get; set; }
     public DateTime CreatedAt { get; set; }
     public int ItemsCount { get; set; }
+
+    // Pricing breakdown
+    public int Subtotal { get; set; }
+    public int OrderDiscountAmount { get; set; }
 }

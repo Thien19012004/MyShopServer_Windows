@@ -5,6 +5,7 @@ public class CreateOrderDto
     public int? CustomerId { get; set; }
     public int SaleId { get; set; }
     public List<CreateOrderItemDto> Items { get; set; } = new();
+    public List<int>? PromotionIds { get; set; }
 }
 
 public class CreateOrderItemDto

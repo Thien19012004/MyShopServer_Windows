@@ -1,296 +1,481 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using MyShopServer.Application.Common;
 using MyShopServer.Application.Services.Interfaces;
 using MyShopServer.DTOs.Common;
 using MyShopServer.DTOs.Orders;
 using MyShopServer.Domain.Enums;
 using MyShopServer.Infrastructure.Data;
-using MyShopServer.Application.Common;
 
 namespace MyShopServer.Application.Services.Implementations;
 
 public class OrderService : IOrderService
 {
     private readonly AppDbContext _db;
-    private readonly IPromotionService _promotion;
 
-    public OrderService(AppDbContext db, IPromotionService promotion)
+    public OrderService(AppDbContext db)
     {
         _db = db;
-        _promotion = promotion;
     }
 
-    private async Task<Dictionary<int, int>> GetBestDiscountMapAsync(
-    IReadOnlyCollection<int> productIds,
-    DateTime at,
-    CancellationToken ct)
+    // =========================================================
+    // PROMOTION HELPERS
+    // =========================================================
+
+    // Only allow Order-scope promotions for OrderPromotionIds
+    private async Task<List<int>> NormalizeAndValidateOrderPromotionIdsAsync(
+        List<int>? promotionIds,
+        DateTime at,
+        CancellationToken ct)
+    {
+        var ids = (promotionIds ?? new List<int>())
+            .Where(x => x > 0)
+            .Distinct()
+            .ToList();
+
+        if (ids.Count == 0) return new List<int>();
+
+        var promos = await _db.Promotions
+            .AsNoTracking()
+            .Where(p => ids.Contains(p.PromotionId))
+            .Select(p => new
+            {
+                p.PromotionId,
+                p.Scope,
+                p.StartDate,
+                p.EndDate,
+                p.Name,
+                p.DiscountPercent
+            })
+            .ToListAsync(ct);
+
+        if (promos.Count != ids.Count)
+            throw new Exception("Some promotionIds do not exist.");
+
+        if (promos.Any(p => p.Scope != PromotionScope.Order))
+            throw new Exception("Only Order-scope promotions are allowed for order.");
+
+        var notActive = promos.FirstOrDefault(p => !(p.StartDate <= at && at <= p.EndDate));
+        if (notActive != null)
+            throw new Exception($"Promotion '{notActive.Name}' is not active.");
+
+        if (promos.Any(p => p.DiscountPercent < 0 || p.DiscountPercent > 100))
+            throw new Exception("Invalid DiscountPercent (must be 0..100).");
+
+        return ids;
+    }
+
+    // Best discount (max) for each product from:
+    // - product promotions (scope Product)
+    // - category promotions (scope Category)
+    private async Task<Dictionary<int, int>> GetBestProductOrCategoryDiscountMapAsync(
+        IReadOnlyCollection<int> productIds,
+        DateTime at,
+        CancellationToken ct)
+    {
+        var map = productIds.ToDictionary(id => id, _ => 0);
+        if (productIds.Count == 0) return map;
+
+        // Product-scope best
+        var productBest = await _db.ProductPromotions
+            .AsNoTracking()
+            .Where(pp => productIds.Contains(pp.ProductId))
+            .Where(pp =>
+                pp.Promotion.Scope == PromotionScope.Product &&
+                pp.Promotion.StartDate <= at && at <= pp.Promotion.EndDate)
+            .GroupBy(pp => pp.ProductId)
+            .Select(g => new { ProductId = g.Key, Best = g.Max(x => x.Promotion.DiscountPercent) })
+            .ToListAsync(ct);
+
+        foreach (var x in productBest)
+            map[x.ProductId] = Math.Max(map[x.ProductId], Math.Clamp(x.Best, 0, 100));
+
+        // Category-scope best
+        var categoryBest = await _db.Products
+            .AsNoTracking()
+            .Where(p => productIds.Contains(p.ProductId))
+            .Select(p => new { p.ProductId, p.CategoryId })
+            .Join(
+                _db.CategoryPromotions.AsNoTracking(),
+                pc => pc.CategoryId,
+                cp => cp.CategoryId,
+                (pc, cp) => new { pc.ProductId, Promo = cp.Promotion }
+            )
+            .Where(x =>
+                x.Promo.Scope == PromotionScope.Category &&
+                x.Promo.StartDate <= at && at <= x.Promo.EndDate)
+            .GroupBy(x => x.ProductId)
+            .Select(g => new { ProductId = g.Key, Best = g.Max(x => x.Promo.DiscountPercent) })
+            .ToListAsync(ct);
+
+        foreach (var x in categoryBest)
+            map[x.ProductId] = Math.Max(map[x.ProductId], Math.Clamp(x.Best, 0, 100));
+
+        return map;
+    }
+
+    // AUTO apply product/category promotions to compute unit price
+    private async Task<Dictionary<int, int>> CalculateUnitPriceMap_AutoProductCategoryPromoAsync(
+        IReadOnlyCollection<int> productIds,
+        DateTime at,
+        CancellationToken ct)
     {
         if (productIds.Count == 0) return new Dictionary<int, int>();
 
-        return await _db.ProductPromotions
-            .AsNoTracking()
-            .Where(pp => productIds.Contains(pp.ProductId))
-            .Select(pp => new
-            {
-                pp.ProductId,
-                pp.Promotion.DiscountPercent,
-                pp.Promotion.StartDate,
-                pp.Promotion.EndDate
-            })
-            .Where(x => x.StartDate <= at && at <= x.EndDate)
-            .GroupBy(x => x.ProductId)
-            .Select(g => new { ProductId = g.Key, Best = g.Max(t => t.DiscountPercent) })
-            .ToDictionaryAsync(x => x.ProductId, x => x.Best, ct);
-    }
-
-    private async Task EnsurePromotionStillValidWhenPayAsync(
-    IReadOnlyCollection<Domain.Entities.OrderItem> items,
-    DateTime at,
-    CancellationToken ct)
-    {
-        var productIds = items.Select(i => i.ProductId).Distinct().ToList();
-
-        // lấy salePrice hiện tại của product
-        var priceMap = await _db.Products
+        var basePrices = await _db.Products
             .AsNoTracking()
             .Where(p => productIds.Contains(p.ProductId))
             .Select(p => new { p.ProductId, p.SalePrice })
-            .ToDictionaryAsync(x => x.ProductId, x => x.SalePrice, ct);
+            .ToListAsync(ct);
 
-        // best discount hiện tại (active tại thời điểm at)
-        var discountMap = await GetBestDiscountMapAsync(productIds, at, ct);
+        if (basePrices.Count != productIds.Count)
+            throw new Exception("Some products in the order do not exist.");
 
-        foreach (var item in items)
-        {
-            if (!priceMap.TryGetValue(item.ProductId, out var salePriceNow))
-                throw new Exception($"Product {item.ProductId} not found.");
+        var discountMap = await GetBestProductOrCategoryDiscountMapAsync(productIds, at, ct);
 
-            // suy ra: order này "đang dùng promotion" nếu unitPrice thấp hơn salePrice hiện tại
-            var hadDiscount = item.UnitPrice < salePriceNow;
-            if (!hadDiscount) continue;
-
-            var bestPct = discountMap.TryGetValue(item.ProductId, out var best) ? best : 0;
-            if (bestPct <= 0)
-                throw new Exception($"Promotion expired for productId={item.ProductId}. Cannot pay.");
-
-            var expectedUnit = MyShopServer.Application.Common.PriceCalc.ApplyDiscount(salePriceNow, bestPct);
-
-            if (expectedUnit != item.UnitPrice)
-                throw new Exception(
-                    $"Promotion changed for productId={item.ProductId}. " +
-                    $"Expected unitPrice={expectedUnit} but order has unitPrice={item.UnitPrice}. Cannot pay.");
-        }
+        return basePrices.ToDictionary(
+            x => x.ProductId,
+            x =>
+            {
+                var pct = discountMap.TryGetValue(x.ProductId, out var d) ? d : 0;
+                return PriceCalc.ApplyDiscount(x.SalePrice, pct);
+            }
+        );
     }
 
+    // discountPercentApplied = best order promo percent (max)
+    // discountAmount uses LONG to avoid overflow
+    private async Task<(int pct, int amount)> CalculateOrderDiscountAsync(
+        int subtotal,
+        List<int> orderPromotionIds,
+        DateTime at,
+        CancellationToken ct)
+    {
+        if (subtotal <= 0) return (0, 0);
+        if (orderPromotionIds == null || orderPromotionIds.Count == 0) return (0, 0);
 
-    // ==========================
+        var best = await _db.Promotions
+            .AsNoTracking()
+            .Where(p => orderPromotionIds.Contains(p.PromotionId))
+            .Where(p => p.Scope == PromotionScope.Order)
+            .Where(p => p.StartDate <= at && at <= p.EndDate)
+            .Select(p => (int?)p.DiscountPercent)
+            .MaxAsync(ct);
+
+        var pct = Math.Clamp(best ?? 0, 0, 100);
+        if (pct <= 0) return (0, 0);
+
+        // ✅ IMPORTANT: use long to avoid overflow
+        long amountLong = (long)subtotal * pct / 100;
+        if (amountLong < 0) amountLong = 0;
+        if (amountLong > subtotal) amountLong = subtotal;
+
+        return (pct, (int)amountLong);
+    }
+
+    // =========================================================
     // CREATE
-    // ==========================
+    // =========================================================
     public async Task<OrderDetailDto> CreateOrderAsync(CreateOrderDto dto, CancellationToken ct = default)
     {
         if (dto.Items == null || dto.Items.Count == 0)
-        {
             throw new Exception("Order must have at least one item.");
-        }
 
-        // Kiểm tra sale
-        var sale = await _db.Users
-            .AsNoTracking()
-            .SingleOrDefaultAsync(u => u.UserId == dto.SaleId, ct);
-
-        if (sale == null)
-        {
+        var saleExists = await _db.Users.AsNoTracking()
+            .AnyAsync(u => u.UserId == dto.SaleId, ct);
+        if (!saleExists)
             throw new Exception($"Sale with id {dto.SaleId} does not exist.");
-        }
-
-        // Load các product liên quan
-        var productIds = dto.Items.Select(i => i.ProductId).Distinct().ToList();
-
-        var products = await _db.Products
-            .Where(p => productIds.Contains(p.ProductId))
-            .ToListAsync(ct);
 
         var at = DateTime.UtcNow;
-        var discountMap = await GetBestDiscountMapAsync(productIds, at, ct);
 
-        if (products.Count != productIds.Count)
+        if (dto.CustomerId.HasValue)
         {
-            throw new Exception("Some products in the order do not exist.");
+            var customerExists = await _db.Customers.AsNoTracking()
+                .AnyAsync(c => c.CustomerId == dto.CustomerId.Value, ct);
+            if (!customerExists)
+                throw new Exception($"Customer with id {dto.CustomerId.Value} does not exist.");
         }
 
-        // Tạo Order + Items
+        var productIds = dto.Items.Select(i => i.ProductId).Distinct().ToList();
+        var unitPriceMap = await CalculateUnitPriceMap_AutoProductCategoryPromoAsync(productIds, at, ct);
+
+        // order-scope promotions only
+        var orderPromoIds = await NormalizeAndValidateOrderPromotionIdsAsync(dto.PromotionIds, at, ct);
+
         var order = new Domain.Entities.Order
         {
             CustomerId = dto.CustomerId,
             SaleId = dto.SaleId,
             Status = OrderStatus.Created,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = at
         };
 
-        int total = 0;
         var items = new List<Domain.Entities.OrderItem>();
+        long subtotalLong = 0;
 
         foreach (var i in dto.Items)
         {
-            var product = products.Single(p => p.ProductId == i.ProductId);
-            var pct = discountMap.TryGetValue(product.ProductId, out var best) ? best : 0;
-            var unitPrice = PriceCalc.ApplyDiscount(product.SalePrice, pct);
-            var lineTotal = unitPrice * i.Quantity;
+            if (i.Quantity <= 0)
+                throw new Exception("Quantity must be greater than 0.");
 
-            total += lineTotal;
+            var unit = unitPriceMap[i.ProductId];
+
+            // ✅ IMPORTANT: use long
+            long lineLong = (long)unit * i.Quantity;
+            if (lineLong > int.MaxValue)
+                throw new OverflowException("Line total exceeds int.MaxValue. Consider using long for money.");
+
+            subtotalLong += lineLong;
+            if (subtotalLong > int.MaxValue)
+                throw new OverflowException("Subtotal exceeds int.MaxValue. Consider using long for money.");
 
             items.Add(new Domain.Entities.OrderItem
             {
                 ProductId = i.ProductId,
                 Quantity = i.Quantity,
-                UnitPrice = unitPrice,
-                TotalPrice = lineTotal
+                UnitPrice = unit,
+                TotalPrice = (int)lineLong
             });
         }
 
-        order.TotalPrice = total;
+        var subtotal = (int)subtotalLong;
+
+        var (pct, discountAmount) = await CalculateOrderDiscountAsync(subtotal, orderPromoIds, at, ct);
+
         order.Items = items;
+        order.TotalPrice = subtotal - discountAmount;
+
+        if (orderPromoIds.Count > 0)
+        {
+            order.OrderPromotions = orderPromoIds
+                .Select(pid => new Domain.Entities.OrderPromotion { PromotionId = pid })
+                .ToList();
+        }
 
         _db.Orders.Add(order);
         await _db.SaveChangesAsync(ct);
 
         return await GetOrderDetailInternalAsync(order.OrderId, ct)
-            ?? throw new Exception("Failed to load created order.");
+               ?? throw new Exception("Failed to load created order.");
     }
 
-    // ==========================
+    // =========================================================
     // UPDATE
-    // ==========================
+    // =========================================================
     public async Task<OrderDetailDto> UpdateOrderAsync(int orderId, UpdateOrderDto dto, CancellationToken ct = default)
     {
         var order = await _db.Orders
             .Include(o => o.Items)
-            .Include(o => o.Customer)
-            .Include(o => o.Sale)
+            .Include(o => o.OrderPromotions)
             .SingleOrDefaultAsync(o => o.OrderId == orderId, ct);
-
 
         if (order == null)
             throw new Exception("Order not found");
 
-        // Nếu đổi sang Paid: chỉ cho phép từ Created và phải check promotion còn hiệu lực (nếu order đang hưởng giảm)
-        if (dto.Status.HasValue && dto.Status.Value == OrderStatus.Paid)
-        {
-            if (order.Status != OrderStatus.Created)
-                throw new Exception("Only Created orders can be paid.");
+        // Paid orders cannot be updated
+        if (order.Status == OrderStatus.Paid)
+            throw new Exception("Paid orders cannot be updated.");
 
-            // không cho sửa items trong lúc pay (optional nhưng hợp lý)
-            // nếu bạn vẫn cho sửa items, thì kiểm tra sau khi replace items
-            var at = DateTime.UtcNow;
-            await EnsurePromotionStillValidWhenPayAsync(order.Items.ToList(), at, ct);
-        }
+        var at = DateTime.UtcNow;
 
-
-        // Cập nhật customer
         if (dto.CustomerId.HasValue)
         {
-            // hoặc check customer có tồn tại không nếu cần
+            var customerExists = await _db.Customers.AsNoTracking()
+                .AnyAsync(c => c.CustomerId == dto.CustomerId.Value, ct);
+            if (!customerExists)
+                throw new Exception($"Customer with id {dto.CustomerId.Value} does not exist.");
+
             order.CustomerId = dto.CustomerId.Value;
         }
 
-        // Cập nhật status
         if (dto.Status.HasValue)
-        {
             order.Status = dto.Status.Value;
+
+        // ---- Update order promotions (Order scope only) ----
+        var promotionsChanged = false;
+        if (dto.PromotionIds != null)
+        {
+            var newIds = await NormalizeAndValidateOrderPromotionIdsAsync(dto.PromotionIds, at, ct);
+
+            var oldIds = order.OrderPromotions
+                .Select(x => x.PromotionId)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
+
+            var sortedNew = newIds.OrderBy(x => x).ToList();
+
+            if (!oldIds.SequenceEqual(sortedNew))
+            {
+                promotionsChanged = true;
+
+                _db.OrderPromotions.RemoveRange(order.OrderPromotions);
+                order.OrderPromotions.Clear();
+
+                foreach (var pid in sortedNew)
+                {
+                    order.OrderPromotions.Add(new Domain.Entities.OrderPromotion
+                    {
+                        OrderId = order.OrderId,
+                        PromotionId = pid
+                    });
+                }
+            }
         }
 
-        // Nếu có Items mới → replace toàn bộ
+        // ---- Replace items ----
         if (dto.Items != null)
         {
             if (dto.Items.Count == 0)
                 throw new Exception("Order must have at least one item.");
 
-            // Xoá items cũ
             _db.OrderItems.RemoveRange(order.Items);
             order.Items.Clear();
 
             var productIds = dto.Items.Select(i => i.ProductId).Distinct().ToList();
+            var unitPriceMap = await CalculateUnitPriceMap_AutoProductCategoryPromoAsync(productIds, at, ct);
 
-            var products = await _db.Products
-                .Where(p => productIds.Contains(p.ProductId))
-                .ToListAsync(ct);
-
-            var at = DateTime.UtcNow;
-            var discountMap = await GetBestDiscountMapAsync(productIds, at, ct);
-
-            if (products.Count != productIds.Count)
-                throw new Exception("Some products in the order do not exist.");
-
-            int total = 0;
             var newItems = new List<Domain.Entities.OrderItem>();
+            long subtotalLong = 0;
 
             foreach (var i in dto.Items)
             {
-                var product = products.Single(p => p.ProductId == i.ProductId);
-                var pct = discountMap.TryGetValue(product.ProductId, out var best) ? best : 0;
-                var unitPrice = PriceCalc.ApplyDiscount(product.SalePrice, pct);
-                var lineTotal = unitPrice * i.Quantity;
-                total += lineTotal;
+                if (i.Quantity <= 0)
+                    throw new Exception("Quantity must be greater than 0.");
+
+                var unit = unitPriceMap[i.ProductId];
+
+                long lineLong = (long)unit * i.Quantity;
+                if (lineLong > int.MaxValue)
+                    throw new OverflowException("Line total exceeds int.MaxValue. Consider using long for money.");
+
+                subtotalLong += lineLong;
+                if (subtotalLong > int.MaxValue)
+                    throw new OverflowException("Subtotal exceeds int.MaxValue. Consider using long for money.");
 
                 newItems.Add(new Domain.Entities.OrderItem
                 {
                     ProductId = i.ProductId,
                     Quantity = i.Quantity,
-                    UnitPrice = unitPrice,
-                    TotalPrice = lineTotal
+                    UnitPrice = unit,
+                    TotalPrice = (int)lineLong
                 });
             }
 
-            order.TotalPrice = total;
             order.Items = newItems;
+
+            var subtotal = (int)subtotalLong;
+            var orderPromoIds = order.OrderPromotions.Select(x => x.PromotionId).Distinct().ToList();
+            var (_, discount) = await CalculateOrderDiscountAsync(subtotal, orderPromoIds, at, ct);
+
+            order.TotalPrice = subtotal - discount;
+        }
+        else if (promotionsChanged)
+        {
+            // Only promotions changed => do not recalc unit prices, only recalc order total
+            var subtotal = order.Items.Sum(i => i.TotalPrice);
+            var orderPromoIds = order.OrderPromotions.Select(x => x.PromotionId).Distinct().ToList();
+            var (_, discount) = await CalculateOrderDiscountAsync(subtotal, orderPromoIds, at, ct);
+
+            order.TotalPrice = subtotal - discount;
         }
 
         await _db.SaveChangesAsync(ct);
 
         return await GetOrderDetailInternalAsync(order.OrderId, ct)
-            ?? throw new Exception("Failed to load updated order.");
+               ?? throw new Exception("Failed to load updated order.");
     }
 
-    // ==========================
+    // =========================================================
     // DELETE
-    // ==========================
+    // =========================================================
     public async Task<bool> DeleteOrderAsync(int orderId, CancellationToken ct = default)
     {
         var order = await _db.Orders
             .Include(o => o.Items)
+            .Include(o => o.OrderPromotions)
             .SingleOrDefaultAsync(o => o.OrderId == orderId, ct);
 
-        if (order == null)
-            return false;
-
-        // Nếu muốn chặn xoá đơn đã Paid:
-        // if (order.Status == OrderStatus.Paid)
-        //     throw new Exception("Cannot delete a paid order.");
+        if (order == null) return false;
 
         _db.OrderItems.RemoveRange(order.Items);
+        _db.OrderPromotions.RemoveRange(order.OrderPromotions);
         _db.Orders.Remove(order);
+
         await _db.SaveChangesAsync(ct);
         return true;
     }
 
-    // ==========================
+    // =========================================================
     // GET BY ID
-    // ==========================
+    // =========================================================
     public async Task<OrderDetailDto?> GetOrderByIdAsync(int orderId, CancellationToken ct = default)
-    {
-        return await GetOrderDetailInternalAsync(orderId, ct);
-    }
+        => await GetOrderDetailInternalAsync(orderId, ct);
 
     private async Task<OrderDetailDto?> GetOrderDetailInternalAsync(int orderId, CancellationToken ct)
     {
         var order = await _db.Orders
             .AsNoTracking()
-            .Include(o => o.Items)
-                .ThenInclude(i => i.Product)
-            .Include(o => o.Customer)
-            .Include(o => o.Sale)
-            .SingleOrDefaultAsync(o => o.OrderId == orderId, ct);
+       .Include(o => o.Items).ThenInclude(i => i.Product)
+      .Include(o => o.Customer)
+        .Include(o => o.Sale)
+ .Include(o => o.OrderPromotions)
+         .SingleOrDefaultAsync(o => o.OrderId == orderId, ct);
 
         if (order == null) return null;
+
+        var subtotal = order.Items.Sum(i => i.TotalPrice);
+
+        // Make these fields ALWAYS consistent with stored TotalPrice
+        var discountAmount = Math.Clamp(subtotal - order.TotalPrice, 0, subtotal);
+
+        // percent derived from actual stored discount (rounded)
+        var discountPercent = subtotal <= 0
+     ? 0
+        : (int)Math.Round(discountAmount * 100.0 / subtotal);
+
+        // Order-scope promotion IDs (from OrderPromotions table)
+        var orderPromoIds = order.OrderPromotions.Select(op => op.PromotionId).Distinct().ToList();
+
+        // Get all Product/Category-scope promotions that were applied to items
+        var productIds = order.Items.Select(i => i.ProductId).Distinct().ToList();
+        var at = order.CreatedAt; // Use order creation time to get promotions active at that time
+
+        // Get Product-scope promotions
+        var productPromoIds = await _db.ProductPromotions
+            .AsNoTracking()
+            .Where(pp => productIds.Contains(pp.ProductId))
+            .Where(pp =>
+            pp.Promotion.Scope == PromotionScope.Product &&
+            pp.Promotion.StartDate <= at && at <= pp.Promotion.EndDate)
+            .Select(pp => pp.Promotion.PromotionId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        // Get Category-scope promotions
+        var categoryIds = await _db.Products
+            .AsNoTracking()
+            .Where(p => productIds.Contains(p.ProductId))
+            .Select(p => p.CategoryId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var categoryPromoIds = await _db.CategoryPromotions
+            .AsNoTracking()
+            .Where(cp => categoryIds.Contains(cp.CategoryId))
+            .Where(cp =>
+            cp.Promotion.Scope == PromotionScope.Category &&
+            cp.Promotion.StartDate <= at && at <= cp.Promotion.EndDate)
+            .Select(cp => cp.Promotion.PromotionId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        // Merge all promotion IDs: Order + Product + Category
+        var allPromotionIds = orderPromoIds
+            .Concat(productPromoIds)
+            .Concat(categoryPromoIds)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
 
         return new OrderDetailDto
         {
@@ -304,7 +489,7 @@ public class OrderService : IOrderService
             TotalPrice = order.TotalPrice,
             CreatedAt = order.CreatedAt,
             Items = order.Items
-                .OrderBy(i => i.OrderItemId)
+            .OrderBy(i => i.OrderItemId)
                 .Select(i => new OrderItemDto
                 {
                     OrderItemId = i.OrderItemId,
@@ -314,22 +499,26 @@ public class OrderService : IOrderService
                     UnitPrice = i.UnitPrice,
                     TotalPrice = i.TotalPrice
                 })
-                .ToList()
+                .ToList(),
+
+            PromotionIds = allPromotionIds, // All applied: Order + Product + Category
+            Subtotal = subtotal,
+            OrderDiscountAmount = discountAmount,
+            OrderDiscountPercentApplied = discountPercent
         };
     }
 
-    // ==========================
+    // =========================================================
     // LIST + FILTER + PAGING
-    // ==========================
-    public async Task<PagedResult<OrderListItemDto>> GetOrdersAsync(
-        OrderQueryOptions options,
-        CancellationToken ct = default)
+    // =========================================================
+    public async Task<PagedResult<OrderListItemDto>> GetOrdersAsync(OrderQueryOptions options, CancellationToken ct = default)
     {
         var query = _db.Orders
             .AsNoTracking()
             .Include(o => o.Customer)
             .Include(o => o.Sale)
             .Include(o => o.Items)
+            .Include(o => o.OrderPromotions)
             .AsQueryable();
 
         if (options.FromDate.HasValue)
@@ -345,19 +534,13 @@ public class OrderService : IOrderService
         }
 
         if (options.CustomerId.HasValue)
-        {
-            query = query.Where(o => o.CustomerId == options.CustomerId);
-        }
+            query = query.Where(o => o.CustomerId == options.CustomerId.Value);
 
         if (options.SaleId.HasValue)
-        {
-            query = query.Where(o => o.SaleId == options.SaleId);
-        }
+            query = query.Where(o => o.SaleId == options.SaleId.Value);
 
         if (options.Status.HasValue)
-        {
-            query = query.Where(o => o.Status == options.Status);
-        }
+            query = query.Where(o => o.Status == options.Status.Value);
 
         query = query.OrderByDescending(o => o.CreatedAt);
 
@@ -366,20 +549,29 @@ public class OrderService : IOrderService
         var page = options.Page <= 0 ? 1 : options.Page;
         var pageSize = options.PageSize <= 0 ? 10 : options.PageSize;
 
-        var items = await query
+        var orders = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(o => new OrderListItemDto
+            .ToListAsync(ct);
+
+        var items = orders.Select(o =>
+        {
+            var subtotal = o.Items.Sum(x => x.TotalPrice);
+            var discount = Math.Clamp(subtotal - o.TotalPrice, 0, subtotal);
+
+            return new OrderListItemDto
             {
                 OrderId = o.OrderId,
-                CustomerName = o.Customer!.Name,
-                SaleName = o.Sale!.FullName,
+                CustomerName = o.Customer?.Name,
+                SaleName = o.Sale?.FullName,
                 Status = o.Status,
                 TotalPrice = o.TotalPrice,
                 CreatedAt = o.CreatedAt,
-                ItemsCount = o.Items.Count
-            })
-            .ToListAsync(ct);
+                ItemsCount = o.Items.Count,
+                Subtotal = subtotal,
+                OrderDiscountAmount = discount
+            };
+        }).ToList();
 
         return new PagedResult<OrderListItemDto>
         {

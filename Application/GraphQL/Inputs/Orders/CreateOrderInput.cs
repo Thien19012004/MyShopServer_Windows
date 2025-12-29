@@ -3,5 +3,6 @@
 public record CreateOrderInput(
     int? CustomerId,
     int SaleId,
-    List<OrderItemInput> Items
+    List<OrderItemInput> Items,
+    List<int>? PromotionIds // scope=Order, optional
 );

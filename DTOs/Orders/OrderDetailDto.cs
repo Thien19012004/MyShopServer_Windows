@@ -18,4 +18,12 @@ public class OrderDetailDto
     public DateTime CreatedAt { get; set; }
 
     public List<OrderItemDto> Items { get; set; } = new();
+    
+    // All applied promotion IDs (Order + Product + Category scopes)
+    public List<int> PromotionIds { get; set; } = new();
+
+    // New: pricing breakdown
+    public int Subtotal { get; set; }
+    public int OrderDiscountAmount { get; set; }
+    public int OrderDiscountPercentApplied { get; set; }
 }

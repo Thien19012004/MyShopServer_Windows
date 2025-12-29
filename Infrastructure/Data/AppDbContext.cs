@@ -50,6 +50,12 @@ public class AppDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     // ======================
+    // CategoryPromotion / OrderPromotion
+    // ======================
+    public DbSet<CategoryPromotion> CategoryPromotions => Set<CategoryPromotion>();
+    public DbSet<OrderPromotion> OrderPromotions => Set<OrderPromotion>();
+
+    // ======================
     // MODEL CONFIGURATION
     // ======================
     protected override void OnModelCreating(ModelBuilder modelBuilder)

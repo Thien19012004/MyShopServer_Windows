@@ -25,6 +25,7 @@ public class OrderMutations
             {
                 CustomerId = input.CustomerId,
                 SaleId = input.SaleId,
+                PromotionIds = input.PromotionIds,
                 Items = input.Items
                     .Select(i => new CreateOrderItemDto
                     {
@@ -73,6 +74,7 @@ public class OrderMutations
             {
                 CustomerId = input.CustomerId,
                 Status = input.Status,
+                PromotionIds = input.PromotionIds,
                 Items = input.Items?.Select(i => new UpdateOrderItemDto
                 {
                     ProductId = i.ProductId,
