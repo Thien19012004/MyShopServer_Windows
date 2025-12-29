@@ -262,11 +262,19 @@ public class PromotionService : IPromotionService
     {
         var entity = await _db.Promotions
             .Include(x => x.ProductPromotions)
-         .Include(x => x.CategoryPromotions)
-  .Include(x => x.OrderPromotions)
-     .SingleOrDefaultAsync(x => x.PromotionId == promotionId, ct);
+            .Include(x => x.CategoryPromotions)
+            .Include(x => x.OrderPromotions)
+            .SingleOrDefaultAsync(x => x.PromotionId == promotionId, ct);
 
         if (entity == null) return false;
+
+        var now = DateTime.UtcNow;
+        var isActive = entity.StartDate <= now && now <= entity.EndDate;
+        if (isActive)
+        {
+            throw new Exception("Cannot delete an active promotion. Please wait until it expires.");
+        }
+
 
         _db.ProductPromotions.RemoveRange(entity.ProductPromotions);
         _db.CategoryPromotions.RemoveRange(entity.CategoryPromotions);
