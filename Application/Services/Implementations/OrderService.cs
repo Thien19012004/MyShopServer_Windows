@@ -415,11 +415,11 @@ public class OrderService : IOrderService
     {
         var order = await _db.Orders
             .AsNoTracking()
-       .Include(o => o.Items).ThenInclude(i => i.Product)
-      .Include(o => o.Customer)
-        .Include(o => o.Sale)
- .Include(o => o.OrderPromotions)
-         .SingleOrDefaultAsync(o => o.OrderId == orderId, ct);
+            .Include(o => o.Items).ThenInclude(i => i.Product)
+            .Include(o => o.Customer)
+            .Include(o => o.Sale)
+            .Include(o => o.OrderPromotions)
+            .SingleOrDefaultAsync(o => o.OrderId == orderId, ct);
 
         if (order == null) return null;
 
@@ -436,43 +436,97 @@ public class OrderService : IOrderService
         // Order-scope promotion IDs (from OrderPromotions table)
         var orderPromoIds = order.OrderPromotions.Select(op => op.PromotionId).Distinct().ToList();
 
-        // Get all Product/Category-scope promotions that were applied to items
+        // For product/category promotions: include ONLY the promotion(s) that actually produced the
+        // applied unit price (best discount) at order.CreatedAt.
+        var at = order.CreatedAt;
         var productIds = order.Items.Select(i => i.ProductId).Distinct().ToList();
-        var at = order.CreatedAt; // Use order creation time to get promotions active at that time
 
-        // Get Product-scope promotions
-        var productPromoIds = await _db.ProductPromotions
+        // Load product -> category
+        var productCategoryMap = await _db.Products
+            .AsNoTracking()
+            .Where(p => productIds.Contains(p.ProductId))
+            .Select(p => new { p.ProductId, p.CategoryId })
+            .ToListAsync(ct);
+
+        var categoryByProduct = productCategoryMap.ToDictionary(x => x.ProductId, x => x.CategoryId);
+        var categoryIds = productCategoryMap.Select(x => x.CategoryId).Distinct().ToList();
+
+        // Active product promos for these products
+        var activeProductPromos = await _db.ProductPromotions
             .AsNoTracking()
             .Where(pp => productIds.Contains(pp.ProductId))
             .Where(pp =>
-            pp.Promotion.Scope == PromotionScope.Product &&
-            pp.Promotion.StartDate <= at && at <= pp.Promotion.EndDate)
-            .Select(pp => pp.Promotion.PromotionId)
-            .Distinct()
+                pp.Promotion.Scope == PromotionScope.Product &&
+                pp.Promotion.StartDate <= at && at <= pp.Promotion.EndDate)
+            .Select(pp => new { pp.ProductId, pp.PromotionId, pp.Promotion.DiscountPercent })
             .ToListAsync(ct);
 
-        // Get Category-scope promotions
-        var categoryIds = await _db.Products
-            .AsNoTracking()
-            .Where(p => productIds.Contains(p.ProductId))
-            .Select(p => p.CategoryId)
-            .Distinct()
-            .ToListAsync(ct);
-
-        var categoryPromoIds = await _db.CategoryPromotions
+        // Active category promos for these categories
+        var activeCategoryPromos = await _db.CategoryPromotions
             .AsNoTracking()
             .Where(cp => categoryIds.Contains(cp.CategoryId))
             .Where(cp =>
-            cp.Promotion.Scope == PromotionScope.Category &&
-            cp.Promotion.StartDate <= at && at <= cp.Promotion.EndDate)
-            .Select(cp => cp.Promotion.PromotionId)
-            .Distinct()
+                cp.Promotion.Scope == PromotionScope.Category &&
+                cp.Promotion.StartDate <= at && at <= cp.Promotion.EndDate)
+            .Select(cp => new { cp.CategoryId, cp.PromotionId, cp.Promotion.DiscountPercent })
             .ToListAsync(ct);
 
-        // Merge all promotion IDs: Order + Product + Category
-        var allPromotionIds = orderPromoIds
-            .Concat(productPromoIds)
-            .Concat(categoryPromoIds)
+        // Best promo id per product (if tie on percent => choose smallest PromotionId for stability)
+        var bestPromoIds = new HashSet<int>();
+
+        foreach (var pid in productIds)
+        {
+            var bestPct = 0;
+            int? bestPromoId = null;
+
+            // product-scope candidates
+            foreach (var p in activeProductPromos.Where(x => x.ProductId == pid))
+            {
+                var pct = Math.Clamp(p.DiscountPercent, 0, 100);
+                if (pct > bestPct || (pct == bestPct && bestPromoId.HasValue && p.PromotionId < bestPromoId.Value))
+                {
+                    if (pct > 0)
+                    {
+                        bestPct = pct;
+                        bestPromoId = p.PromotionId;
+                    }
+                }
+                else if (pct == bestPct && !bestPromoId.HasValue && pct > 0)
+                {
+                    bestPct = pct;
+                    bestPromoId = p.PromotionId;
+                }
+            }
+
+            // category-scope candidates
+            if (categoryByProduct.TryGetValue(pid, out var cid))
+            {
+                foreach (var c in activeCategoryPromos.Where(x => x.CategoryId == cid))
+                {
+                    var pct = Math.Clamp(c.DiscountPercent, 0, 100);
+                    if (pct > bestPct || (pct == bestPct && bestPromoId.HasValue && c.PromotionId < bestPromoId.Value))
+                    {
+                        if (pct > 0)
+                        {
+                            bestPct = pct;
+                            bestPromoId = c.PromotionId;
+                        }
+                    }
+                    else if (pct == bestPct && !bestPromoId.HasValue && pct > 0)
+                    {
+                        bestPct = pct;
+                        bestPromoId = c.PromotionId;
+                    }
+                }
+            }
+
+            if (bestPromoId.HasValue)
+                bestPromoIds.Add(bestPromoId.Value);
+        }
+
+        // Merge order + best per-product promo ids
+        var promotionIds = orderPromoIds
+            .Concat(bestPromoIds)
             .Distinct()
             .OrderBy(x => x)
             .ToList();
@@ -490,18 +544,18 @@ public class OrderService : IOrderService
             CreatedAt = order.CreatedAt,
             Items = order.Items
             .OrderBy(i => i.OrderItemId)
-                .Select(i => new OrderItemDto
-                {
-                    OrderItemId = i.OrderItemId,
-                    ProductId = i.ProductId,
-                    ProductName = i.Product?.Name ?? string.Empty,
-                    Quantity = i.Quantity,
-                    UnitPrice = i.UnitPrice,
-                    TotalPrice = i.TotalPrice
-                })
-                .ToList(),
+            .Select(i => new OrderItemDto
+            {
+                OrderItemId = i.OrderItemId,
+                ProductId = i.ProductId,
+                ProductName = i.Product?.Name ?? string.Empty,
+                Quantity = i.Quantity,
+                UnitPrice = i.UnitPrice,
+                TotalPrice = i.TotalPrice
+            })
+            .ToList(),
 
-            PromotionIds = allPromotionIds, // All applied: Order + Product + Category
+            PromotionIds = promotionIds,
             Subtotal = subtotal,
             OrderDiscountAmount = discountAmount,
             OrderDiscountPercentApplied = discountPercent
