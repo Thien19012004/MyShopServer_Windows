@@ -1,5 +1,5 @@
 ﻿### ============================================
-### GRAPHQL_TEST_QUERIES.http (PROMOTIONS + ORDERS)
+### GRAPHQL_TEST_QUERIES.http (PROMOTIONS + ORDERS + KPI)
 ### ============================================
 
 @host = https://localhost:5135
@@ -11,6 +11,12 @@
 # Example IDs (edit)
 @promotionId = 1
 @orderId = 1
+
+# KPI examples (edit)
+@saleId = 3
+@year = 2025
+@month = 12
+@kpiTierId = 1
 
 ### ------------------------------------------------
 ### PROMOTIONS
@@ -30,7 +36,7 @@ Authorization: Bearer {{token}}
       "startDate": "2025-12-19T00:00:00Z",
       "endDate": "2025-12-31T23:59:59Z",
       "scope": "PRODUCT",
-      "productIds": [1,2]
+      "productIds": [1, 2]
     }
   }
 }
@@ -196,7 +202,7 @@ Authorization: Bearer {{token}}
   "variables": {
     "id": {{orderId}},
     "input": {
-    "promotionIds": [7]
+      "promotionIds": [7]
     }
   }
 }
@@ -209,7 +215,7 @@ Authorization: Bearer {{token}}
 {
   "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status subtotal orderDiscountAmount totalPrice promotionIds } } }",
   "variables": {
- "id": {{orderId}},
+    "id": {{orderId}},
     "input": {
       "promotionIds": []
     }
@@ -227,9 +233,9 @@ Authorization: Bearer {{token}}
     "id": {{orderId}},
     "input": {
       "items": [
-     { "productId": 1, "quantity": 1 }
+        { "productId": 1, "quantity": 1 }
       ]
- }
+    }
   }
 }
 
@@ -243,9 +249,9 @@ Authorization: Bearer {{token}}
   "variables": {
     "id": {{orderId}},
     "input": {
-   "promotionIds": [7],
+      "promotionIds": [7],
       "items": [
-   { "productId": 1, "quantity": 2 },
+        { "productId": 1, "quantity": 2 },
         { "productId": 2, "quantity": 1 }
       ]
     }
@@ -283,4 +289,122 @@ Authorization: Bearer {{token}}
 {
   "query": "mutation($id: Int!) { deleteOrder(orderId: $id) { success statusCode message } }",
   "variables": { "id": {{orderId}} }
+}
+
+### ------------------------------------------------
+### KPI
+### ------------------------------------------------
+
+### 19) KPI - list tiers
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "query($page: Int!, $pageSize: Int!) { kpiTiers(page: $page, pageSize: $pageSize) { statusCode success message data { page pageSize totalItems totalPages items { kpiTierId name minRevenue bonusPercent description displayOrder } } } }",
+  "variables": { "page": 1, "pageSize": 10 }
+}
+
+### 20) KPI - create tier
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($input: CreateKpiTierInput!) { createKpiTier(input: $input) { statusCode success message data { kpiTierId name minRevenue bonusPercent description displayOrder } } }",
+  "variables": {
+    "input": {
+      "name": "Diamond",
+      "minRevenue": 250,
+      "bonusPercent": 15,
+      "description": "Đạt >=250% target tháng - Thưởng thêm15%",
+      "displayOrder": 5
+    }
+  }
+}
+
+### 21) KPI - update tier
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($id: Int!, $input: UpdateKpiTierInput!) { updateKpiTier(kpiTierId: $id, input: $input) { statusCode success message } }",
+  "variables": {
+    "id": {{kpiTierId}},
+    "input": {
+      "name": "Bronze",
+      "minRevenue": 100,
+      "bonusPercent": 2,
+      "description": "Đạt >=100% target tháng - Thưởng thêm2%",
+      "displayOrder": 1
+    }
+  }
+}
+
+### 22) KPI - delete tier
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($id: Int!) { deleteKpiTier(kpiTierId: $id) { statusCode success message } }",
+  "variables": { "id": {{kpiTierId}} }
+}
+
+### 23) KPI - set monthly target
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($input: SetMonthlyTargetInput!) { setMonthlyTarget(input: $input) { statusCode success message data { saleKpiTargetId saleId saleName year month targetRevenue actualRevenue progress remainingRevenue kpiTierId kpiTierName bonusAmount calculatedAt createdAt } } }",
+  "variables": {
+    "input": {
+      "saleId": {{saleId}},
+      "year": {{year}},
+      "month": {{month}},
+      "targetRevenue": 150000000
+    }
+  }
+}
+
+### 24) KPI - list targets
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "query($saleId: Int, $year: Int, $month: Int, $page: Int!, $pageSize: Int!) { saleKpiTargets(saleId: $saleId, year: $year, month: $month, page: $page, pageSize: $pageSize) { statusCode success message data { page pageSize totalItems totalPages items { saleKpiTargetId saleId saleName year month targetRevenue actualRevenue progress remainingRevenue kpiTierName bonusAmount calculatedAt createdAt } } } }",
+  "variables": { "saleId": null, "year": {{year}}, "month": {{month}}, "page": 1, "pageSize": 10 }
+}
+
+### 25) KPI - dashboard (estimate, not persisted)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "query($saleId: Int!, $year: Int, $month: Int) { kpiDashboard(saleId: $saleId, year: $year, month: $month) { statusCode success message data { saleId saleName currentYear currentMonth targetRevenue actualRevenue progress remainingRevenue estimatedBaseCommission estimatedBonusCommission estimatedTotalCommission currentKpiTierId currentKpiTierName totalOrdersThisMonth totalOrdersPaid availableTiers { kpiTierId name minRevenue bonusPercent displayOrder } } } }",
+  "variables": { "saleId": {{saleId}}, "year": {{year}}, "month": {{month}} }
+}
+
+### 26) KPI - calculate monthly KPI (persist to KpiCommissions)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "mutation($input: CalculateMonthlyKpiInput!) { calculateMonthlyKpi(input: $input) { statusCode success message data { kpiCommissionId saleId saleName year month baseCommission bonusCommission totalCommission kpiTierId kpiTierName totalRevenue totalOrders calculatedAt } } }",
+  "variables": { "input": { "year": {{year}}, "month": {{month}} } }
+}
+
+### 27) KPI - list KPI commissions
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "query": "query($saleId: Int, $year: Int, $month: Int, $page: Int!, $pageSize: Int!) { kpiCommissions(saleId: $saleId, year: $year, month: $month, page: $page, pageSize: $pageSize) { statusCode success message data { page pageSize totalItems totalPages items { kpiCommissionId saleId saleName year month baseCommission bonusCommission totalCommission kpiTierName totalRevenue totalOrders calculatedAt } } } }",
+  "variables": { "saleId": {{saleId}}, "year": {{year}}, "month": {{month}}, "page": 1, "pageSize": 10 }
 }

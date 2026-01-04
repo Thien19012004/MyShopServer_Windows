@@ -43,10 +43,5 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .WithOne(o => o.Sale)
             .HasForeignKey(o => o.SaleId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        // Quan hệ tới Commissions
-        builder.HasMany(u => u.Commissions)
-            .WithOne(c => c.Sale)
-            .HasForeignKey(c => c.SaleId);
     }
 }

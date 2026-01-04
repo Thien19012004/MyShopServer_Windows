@@ -524,15 +524,6 @@ new ProductPromotion { ProductId = 45, PromotionId = 2 }, // Sony WH-1000XM5 Đe
             PaidAt = now.AddDays(-3).AddHours(1),
         };
 
-        var commission1 = new Commission
-        {
-            CommissionId = 1,
-            SaleId = 3,
-            OrderId = 1,
-            Amount = (int)(order1.TotalPrice * 0.10), // 10% hoa hồng
-            CalculatedAt = now.AddDays(-3).AddHours(2),
-        };
-
         // Order 2: Đã thanh toán - áp dụng category promotion
         var order2 = new Order
         {
@@ -569,15 +560,6 @@ new ProductPromotion { ProductId = 45, PromotionId = 2 }, // Sony WH-1000XM5 Đe
             Method = PaymentMethod.Cash,
             Amount = order2.TotalPrice,
             PaidAt = now.AddDays(-2).AddHours(2),
-        };
-
-        var commission2 = new Commission
-        {
-            CommissionId = 2,
-            SaleId = 4,
-            OrderId = 2,
-            Amount = (int)(order2.TotalPrice * 0.10),
-            CalculatedAt = now.AddDays(-2).AddHours(3),
         };
 
         // Order 3: Chưa thanh toán - có nhiều promotions
@@ -658,7 +640,6 @@ new ProductPromotion { ProductId = 45, PromotionId = 2 }, // Sony WH-1000XM5 Đe
         await db.OrderPromotions.AddRangeAsync(order2Promotions);
         await db.OrderPromotions.AddRangeAsync(order3Promotions);
         await db.Payments.AddRangeAsync(payment1, payment2);
-        await db.Commissions.AddRangeAsync(commission1, commission2);
 
         // ======================
         // APP SETTINGS
@@ -714,6 +695,82 @@ new ProductPromotion { ProductId = 45, PromotionId = 2 }, // Sony WH-1000XM5 Đe
  },
         };
         await db.AuditLogs.AddRangeAsync(logs);
+
+        // ======================
+        // KPI TIERS
+        // ======================
+        var kpiTiers = new[]
+        {
+ // NOTE: Simplified KPI: MinRevenue is interpreted as MinAchievedPercent (progress vs target)
+ new KpiTier
+ {
+ KpiTierId =1,
+ Name = "Bronze",
+ MinRevenue =100, // >=100% target
+ BonusPercent =2,
+ Description = "Đạt >=100% target tháng - Thưởng thêm2%",
+ DisplayOrder =1
+ },
+ new KpiTier
+ {
+ KpiTierId =2,
+ Name = "Silver",
+ MinRevenue =120, // >=120% target
+ BonusPercent =5,
+ Description = "Đạt >=120% target tháng - Thưởng thêm5%",
+ DisplayOrder =2
+ },
+ new KpiTier
+ {
+ KpiTierId =3,
+ Name = "Gold",
+ MinRevenue =150, // >=150% target
+ BonusPercent =8,
+ Description = "Đạt >=150% target tháng - Thưởng thêm8%",
+ DisplayOrder =3
+ },
+ new KpiTier
+ {
+ KpiTierId =4,
+ Name = "Platinum",
+ MinRevenue =200, // >=200% target
+ BonusPercent =12,
+ Description = "Đạt >=200% target tháng - Thưởng thêm12%",
+ DisplayOrder =4
+ }
+ };
+        await db.KpiTiers.AddRangeAsync(kpiTiers);
+
+        // ======================
+        // SALE KPI TARGETS (Tháng hiện tại cho 2 sales)
+        // ======================
+        var currentYear = now.Year;
+        var currentMonth = now.Month;
+
+        var saleKpiTargets = new[]
+        {
+      new SaleKpiTarget
+     {
+           SaleKpiTargetId = 1,
+             SaleId = 3, // Nguyễn Văn An
+            Year = currentYear,
+       Month = currentMonth,
+      TargetRevenue = 100_000_000, // Target 100 triệu
+ActualRevenue = 0,
+            CreatedAt = now.AddDays(-5)
+        },
+        new SaleKpiTarget
+       {
+     SaleKpiTargetId = 2,
+         SaleId = 4, // Trần Thị Bình
+  Year = currentYear,
+    Month = currentMonth,
+          TargetRevenue = 80_000_000, // Target 80 triệu
+     ActualRevenue = 0,
+         CreatedAt = now.AddDays(-5)
+         }
+   };
+        await db.SaleKpiTargets.AddRangeAsync(saleKpiTargets);
 
         await db.SaveChangesAsync();
     }

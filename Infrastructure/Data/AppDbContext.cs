@@ -41,7 +41,9 @@ public class AppDbContext : DbContext
     // ======================
     public DbSet<Promotion> Promotions => Set<Promotion>();
     public DbSet<ProductPromotion> ProductPromotions => Set<ProductPromotion>();
-    public DbSet<Commission> Commissions => Set<Commission>();
+    public DbSet<KpiTier> KpiTiers => Set<KpiTier>();
+    public DbSet<SaleKpiTarget> SaleKpiTargets => Set<SaleKpiTarget>();
+    public DbSet<KpiCommission> KpiCommissions => Set<KpiCommission>();
 
     // ======================
     // CONFIG / AUDIT

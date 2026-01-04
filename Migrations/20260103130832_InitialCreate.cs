@@ -54,6 +54,23 @@ namespace MyShopServer.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "KpiTiers",
+                columns: table => new
+                {
+                    KpiTierId = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
+                    MinRevenue = table.Column<int>(type: "INTEGER", nullable: false),
+                    BonusPercent = table.Column<int>(type: "INTEGER", nullable: false),
+                    Description = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
+                    DisplayOrder = table.Column<int>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_KpiTiers", x => x.KpiTierId);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Promotions",
                 columns: table => new
                 {
@@ -172,6 +189,40 @@ namespace MyShopServer.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "KpiCommissions",
+                columns: table => new
+                {
+                    KpiCommissionId = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    SaleId = table.Column<int>(type: "INTEGER", nullable: false),
+                    Year = table.Column<int>(type: "INTEGER", nullable: false),
+                    Month = table.Column<int>(type: "INTEGER", nullable: false),
+                    BaseCommission = table.Column<int>(type: "INTEGER", nullable: false, defaultValue: 0),
+                    BonusCommission = table.Column<int>(type: "INTEGER", nullable: false, defaultValue: 0),
+                    TotalCommission = table.Column<int>(type: "INTEGER", nullable: false, defaultValue: 0),
+                    KpiTierId = table.Column<int>(type: "INTEGER", nullable: true),
+                    TotalRevenue = table.Column<int>(type: "INTEGER", nullable: false, defaultValue: 0),
+                    TotalOrders = table.Column<int>(type: "INTEGER", nullable: false, defaultValue: 0),
+                    CalculatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_KpiCommissions", x => x.KpiCommissionId);
+                    table.ForeignKey(
+                        name: "FK_KpiCommissions_KpiTiers_KpiTierId",
+                        column: x => x.KpiTierId,
+                        principalTable: "KpiTiers",
+                        principalColumn: "KpiTierId",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_KpiCommissions_Users_SaleId",
+                        column: x => x.SaleId,
+                        principalTable: "Users",
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Orders",
                 columns: table => new
                 {
@@ -198,6 +249,39 @@ namespace MyShopServer.Migrations
                         principalTable: "Users",
                         principalColumn: "UserId",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SaleKpiTargets",
+                columns: table => new
+                {
+                    SaleKpiTargetId = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    SaleId = table.Column<int>(type: "INTEGER", nullable: false),
+                    Year = table.Column<int>(type: "INTEGER", nullable: false),
+                    Month = table.Column<int>(type: "INTEGER", nullable: false),
+                    TargetRevenue = table.Column<int>(type: "INTEGER", nullable: false),
+                    ActualRevenue = table.Column<int>(type: "INTEGER", nullable: false, defaultValue: 0),
+                    KpiTierId = table.Column<int>(type: "INTEGER", nullable: true),
+                    BonusAmount = table.Column<int>(type: "INTEGER", nullable: false, defaultValue: 0),
+                    CalculatedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SaleKpiTargets", x => x.SaleKpiTargetId);
+                    table.ForeignKey(
+                        name: "FK_SaleKpiTargets_KpiTiers_KpiTierId",
+                        column: x => x.KpiTierId,
+                        principalTable: "KpiTiers",
+                        principalColumn: "KpiTierId",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_SaleKpiTargets_Users_SaleId",
+                        column: x => x.SaleId,
+                        principalTable: "Users",
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -265,34 +349,6 @@ namespace MyShopServer.Migrations
                         column: x => x.PromotionId,
                         principalTable: "Promotions",
                         principalColumn: "PromotionId",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Commissions",
-                columns: table => new
-                {
-                    CommissionId = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    SaleId = table.Column<int>(type: "INTEGER", nullable: false),
-                    OrderId = table.Column<int>(type: "INTEGER", nullable: false),
-                    Amount = table.Column<int>(type: "INTEGER", nullable: false),
-                    CalculatedAt = table.Column<DateTime>(type: "TEXT", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Commissions", x => x.CommissionId);
-                    table.ForeignKey(
-                        name: "FK_Commissions_Orders_OrderId",
-                        column: x => x.OrderId,
-                        principalTable: "Orders",
-                        principalColumn: "OrderId",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Commissions_Users_SaleId",
-                        column: x => x.SaleId,
-                        principalTable: "Users",
-                        principalColumn: "UserId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -382,15 +438,20 @@ namespace MyShopServer.Migrations
                 column: "PromotionId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Commissions_OrderId",
-                table: "Commissions",
-                column: "OrderId",
+                name: "IX_KpiCommissions_KpiTierId",
+                table: "KpiCommissions",
+                column: "KpiTierId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_KpiCommissions_SaleId_Year_Month",
+                table: "KpiCommissions",
+                columns: new[] { "SaleId", "Year", "Month" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_Commissions_SaleId",
-                table: "Commissions",
-                column: "SaleId");
+                name: "IX_KpiTiers_DisplayOrder",
+                table: "KpiTiers",
+                column: "DisplayOrder");
 
             migrationBuilder.CreateIndex(
                 name: "IX_OrderItems_OrderId",
@@ -444,6 +505,17 @@ namespace MyShopServer.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_SaleKpiTargets_KpiTierId",
+                table: "SaleKpiTargets",
+                column: "KpiTierId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SaleKpiTargets_SaleId_Year_Month",
+                table: "SaleKpiTargets",
+                columns: new[] { "SaleId", "Year", "Month" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_UserRoles_RoleId",
                 table: "UserRoles",
                 column: "RoleId");
@@ -468,7 +540,7 @@ namespace MyShopServer.Migrations
                 name: "CategoryPromotions");
 
             migrationBuilder.DropTable(
-                name: "Commissions");
+                name: "KpiCommissions");
 
             migrationBuilder.DropTable(
                 name: "OrderItems");
@@ -486,6 +558,9 @@ namespace MyShopServer.Migrations
                 name: "ProductPromotions");
 
             migrationBuilder.DropTable(
+                name: "SaleKpiTargets");
+
+            migrationBuilder.DropTable(
                 name: "UserRoles");
 
             migrationBuilder.DropTable(
@@ -496,6 +571,9 @@ namespace MyShopServer.Migrations
 
             migrationBuilder.DropTable(
                 name: "Promotions");
+
+            migrationBuilder.DropTable(
+                name: "KpiTiers");
 
             migrationBuilder.DropTable(
                 name: "Roles");

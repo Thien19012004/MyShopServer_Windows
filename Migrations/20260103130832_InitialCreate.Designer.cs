@@ -11,7 +11,7 @@ using MyShopServer.Infrastructure.Data;
 namespace MyShopServer.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251228131612_InitialCreate")]
+    [Migration("20260103130832_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -97,36 +97,6 @@ namespace MyShopServer.Migrations
                     b.ToTable("CategoryPromotions", (string)null);
                 });
 
-            modelBuilder.Entity("MyShopServer.Domain.Entities.Commission", b =>
-                {
-                    b.Property<int>("CommissionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Amount")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CalculatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<int>("OrderId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("SaleId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("CommissionId");
-
-                    b.HasIndex("OrderId")
-                        .IsUnique();
-
-                    b.HasIndex("SaleId");
-
-                    b.ToTable("Commissions", (string)null);
-                });
-
             modelBuilder.Entity("MyShopServer.Domain.Entities.Customer", b =>
                 {
                     b.Property<int>("CustomerId")
@@ -153,6 +123,93 @@ namespace MyShopServer.Migrations
                     b.HasKey("CustomerId");
 
                     b.ToTable("Customers", (string)null);
+                });
+
+            modelBuilder.Entity("MyShopServer.Domain.Entities.KpiCommission", b =>
+                {
+                    b.Property<int>("KpiCommissionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BaseCommission")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("BonusCommission")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTime>("CalculatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("KpiTierId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SaleId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TotalCommission")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("TotalOrders")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("TotalRevenue")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("Year")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("KpiCommissionId");
+
+                    b.HasIndex("KpiTierId");
+
+                    b.HasIndex("SaleId", "Year", "Month")
+                        .IsUnique();
+
+                    b.ToTable("KpiCommissions", (string)null);
+                });
+
+            modelBuilder.Entity("MyShopServer.Domain.Entities.KpiTier", b =>
+                {
+                    b.Property<int>("KpiTierId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BonusPercent")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MinRevenue")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("KpiTierId");
+
+                    b.HasIndex("DisplayOrder");
+
+                    b.ToTable("KpiTiers", (string)null);
                 });
 
             modelBuilder.Entity("MyShopServer.Domain.Entities.Order", b =>
@@ -394,6 +451,53 @@ namespace MyShopServer.Migrations
                     b.ToTable("Roles", (string)null);
                 });
 
+            modelBuilder.Entity("MyShopServer.Domain.Entities.SaleKpiTarget", b =>
+                {
+                    b.Property<int>("SaleKpiTargetId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ActualRevenue")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("BonusAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTime?>("CalculatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("KpiTierId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SaleId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TargetRevenue")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("SaleKpiTargetId");
+
+                    b.HasIndex("KpiTierId");
+
+                    b.HasIndex("SaleId", "Year", "Month")
+                        .IsUnique();
+
+                    b.ToTable("SaleKpiTargets", (string)null);
+                });
+
             modelBuilder.Entity("MyShopServer.Domain.Entities.User", b =>
                 {
                     b.Property<int>("UserId")
@@ -478,21 +582,20 @@ namespace MyShopServer.Migrations
                     b.Navigation("Promotion");
                 });
 
-            modelBuilder.Entity("MyShopServer.Domain.Entities.Commission", b =>
+            modelBuilder.Entity("MyShopServer.Domain.Entities.KpiCommission", b =>
                 {
-                    b.HasOne("MyShopServer.Domain.Entities.Order", "Order")
-                        .WithOne()
-                        .HasForeignKey("MyShopServer.Domain.Entities.Commission", "OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.HasOne("MyShopServer.Domain.Entities.KpiTier", "KpiTier")
+                        .WithMany("KpiCommissions")
+                        .HasForeignKey("KpiTierId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("MyShopServer.Domain.Entities.User", "Sale")
-                        .WithMany("Commissions")
+                        .WithMany("KpiCommissions")
                         .HasForeignKey("SaleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Order");
+                    b.Navigation("KpiTier");
 
                     b.Navigation("Sale");
                 });
@@ -605,6 +708,24 @@ namespace MyShopServer.Migrations
                     b.Navigation("Promotion");
                 });
 
+            modelBuilder.Entity("MyShopServer.Domain.Entities.SaleKpiTarget", b =>
+                {
+                    b.HasOne("MyShopServer.Domain.Entities.KpiTier", "KpiTier")
+                        .WithMany("SaleKpiTargets")
+                        .HasForeignKey("KpiTierId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("MyShopServer.Domain.Entities.User", "Sale")
+                        .WithMany("SaleKpiTargets")
+                        .HasForeignKey("SaleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("KpiTier");
+
+                    b.Navigation("Sale");
+                });
+
             modelBuilder.Entity("MyShopServer.Domain.Entities.UserRole", b =>
                 {
                     b.HasOne("MyShopServer.Domain.Entities.Role", "Role")
@@ -634,6 +755,13 @@ namespace MyShopServer.Migrations
             modelBuilder.Entity("MyShopServer.Domain.Entities.Customer", b =>
                 {
                     b.Navigation("Orders");
+                });
+
+            modelBuilder.Entity("MyShopServer.Domain.Entities.KpiTier", b =>
+                {
+                    b.Navigation("KpiCommissions");
+
+                    b.Navigation("SaleKpiTargets");
                 });
 
             modelBuilder.Entity("MyShopServer.Domain.Entities.Order", b =>
@@ -672,9 +800,11 @@ namespace MyShopServer.Migrations
                 {
                     b.Navigation("AuditLogs");
 
-                    b.Navigation("Commissions");
+                    b.Navigation("KpiCommissions");
 
                     b.Navigation("Orders");
+
+                    b.Navigation("SaleKpiTargets");
 
                     b.Navigation("UserRoles");
                 });
