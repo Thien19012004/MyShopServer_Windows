@@ -433,13 +433,41 @@ public class OrderService : IOrderService
      ? 0
         : (int)Math.Round(discountAmount * 100.0 / subtotal);
 
-        // Order-scope promotion IDs (from OrderPromotions table)
-        var orderPromoIds = order.OrderPromotions.Select(op => op.PromotionId).Distinct().ToList();
-
-        // For product/category promotions: include ONLY the promotion(s) that actually produced the
-        // applied unit price (best discount) at order.CreatedAt.
         var at = order.CreatedAt;
+
+        // =====================
+        // PROMOTION IDS (BEST PER SCOPE)
+        // =====================
+        // Goal: return promotion IDs such that:
+        // - ORDER scope: only best order promotion (max pct) among attached OrderPromotions (if any)
+        // - PRODUCT scope: best per product (because each product can have different best product promo)
+        // - CATEGORY scope: best per category involved in the order (max pct)
+        // This avoids returning multiple category promotions when only the best one actually applies.
+
         var productIds = order.Items.Select(i => i.ProductId).Distinct().ToList();
+
+        // --- Order-scope: pick ONLY best among order.OrderPromotions ---
+        List<int> bestOrderPromoIds = new();
+        if (order.OrderPromotions.Count > 0)
+        {
+            var attachedOrderPromoIds = order.OrderPromotions
+                .Select(op => op.PromotionId)
+                .Distinct()
+                .ToList();
+
+            var bestOrderPromoId = await _db.Promotions
+                .AsNoTracking()
+                .Where(p => attachedOrderPromoIds.Contains(p.PromotionId))
+                .Where(p => p.Scope == PromotionScope.Order)
+                .Where(p => p.StartDate <= at && at <= p.EndDate)
+                .OrderByDescending(p => p.DiscountPercent)
+                .ThenBy(p => p.PromotionId) // deterministic
+                .Select(p => (int?)p.PromotionId)
+                .FirstOrDefaultAsync(ct);
+
+            if (bestOrderPromoId.HasValue)
+                bestOrderPromoIds.Add(bestOrderPromoId.Value);
+        }
 
         // Load product -> category
         var productCategoryMap = await _db.Products
@@ -471,62 +499,42 @@ public class OrderService : IOrderService
             .Select(cp => new { cp.CategoryId, cp.PromotionId, cp.Promotion.DiscountPercent })
             .ToListAsync(ct);
 
-        // Best promo id per product (if tie on percent => choose smallest PromotionId for stability)
-        var bestPromoIds = new HashSet<int>();
-
+        // --- Product-scope: best promo per product (used for that product) ---
+        var bestProductPromoIds = new HashSet<int>();
         foreach (var pid in productIds)
         {
-            var bestPct = 0;
-            int? bestPromoId = null;
+            var best = activeProductPromos
+                .Where(x => x.ProductId == pid)
+                .Select(x => new { x.PromotionId, Pct = Math.Clamp(x.DiscountPercent, 0, 100) })
+                .Where(x => x.Pct > 0)
+                .OrderByDescending(x => x.Pct)
+                .ThenBy(x => x.PromotionId)
+                .FirstOrDefault();
 
-            // product-scope candidates
-            foreach (var p in activeProductPromos.Where(x => x.ProductId == pid))
-            {
-                var pct = Math.Clamp(p.DiscountPercent, 0, 100);
-                if (pct > bestPct || (pct == bestPct && bestPromoId.HasValue && p.PromotionId < bestPromoId.Value))
-                {
-                    if (pct > 0)
-                    {
-                        bestPct = pct;
-                        bestPromoId = p.PromotionId;
-                    }
-                }
-                else if (pct == bestPct && !bestPromoId.HasValue && pct > 0)
-                {
-                    bestPct = pct;
-                    bestPromoId = p.PromotionId;
-                }
-            }
-
-            // category-scope candidates
-            if (categoryByProduct.TryGetValue(pid, out var cid))
-            {
-                foreach (var c in activeCategoryPromos.Where(x => x.CategoryId == cid))
-                {
-                    var pct = Math.Clamp(c.DiscountPercent, 0, 100);
-                    if (pct > bestPct || (pct == bestPct && bestPromoId.HasValue && c.PromotionId < bestPromoId.Value))
-                    {
-                        if (pct > 0)
-                        {
-                            bestPct = pct;
-                            bestPromoId = c.PromotionId;
-                        }
-                    }
-                    else if (pct == bestPct && !bestPromoId.HasValue && pct > 0)
-                    {
-                        bestPct = pct;
-                        bestPromoId = c.PromotionId;
-                    }
-                }
-            }
-
-            if (bestPromoId.HasValue)
-                bestPromoIds.Add(bestPromoId.Value);
+            if (best != null)
+                bestProductPromoIds.Add(best.PromotionId);
         }
 
-        // Merge order + best per-product promo ids
-        var promotionIds = orderPromoIds
-            .Concat(bestPromoIds)
+        // --- Category-scope: best promo per category (NOT union across all categories) ---
+        var bestCategoryPromoIds = new HashSet<int>();
+        foreach (var cid in categoryIds)
+        {
+            var best = activeCategoryPromos
+                .Where(x => x.CategoryId == cid)
+                .Select(x => new { x.PromotionId, Pct = Math.Clamp(x.DiscountPercent, 0, 100) })
+                .Where(x => x.Pct > 0)
+                .OrderByDescending(x => x.Pct)
+                .ThenBy(x => x.PromotionId)
+                .FirstOrDefault();
+
+            if (best != null)
+                bestCategoryPromoIds.Add(best.PromotionId);
+        }
+
+        // Merge best IDs from each scope
+        var promotionIds = bestOrderPromoIds
+            .Concat(bestProductPromoIds)
+            .Concat(bestCategoryPromoIds)
             .Distinct()
             .OrderBy(x => x)
             .ToList();
