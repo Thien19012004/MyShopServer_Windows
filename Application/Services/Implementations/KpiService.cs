@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using MyShopServer.Application.Common;
 using MyShopServer.Application.Services.Interfaces;
 using MyShopServer.Domain.Entities;
 using MyShopServer.Domain.Enums;
@@ -313,8 +314,11 @@ CancellationToken ct = default)
         if (paidOrders.Count == 0)
             return null;
 
-        var totalRevenue = paidOrders.Sum(o => o.TotalPrice);
-        var baseCommission = totalRevenue * DEFAULT_COMMISSION_PERCENT / 100;
+        // Sum can overflow int if there are many orders => use long then clamp
+        long totalRevenueLong = paidOrders.Sum(o => (long)o.TotalPrice);
+        var totalRevenue = MoneyCalc.ClampToInt(totalRevenueLong);
+
+        var baseCommission = MoneyCalc.PercentOf(totalRevenue, DEFAULT_COMMISSION_PERCENT);
 
         // Simplest-realistic rule:
         // - if no monthly target => no KPI bonus
@@ -343,11 +347,11 @@ CancellationToken ct = default)
             {
                 achievedTierId = tier.KpiTierId;
                 achievedTierName = tier.Name;
-                bonusCommission = totalRevenue * Math.Clamp(tier.BonusPercent, 0, 100) / 100;
+                bonusCommission = MoneyCalc.PercentOf(totalRevenue, Math.Clamp(tier.BonusPercent, 0, 100));
             }
         }
 
-        var totalCommission = baseCommission + bonusCommission;
+        var totalCommission = MoneyCalc.SafeAdd(baseCommission, bonusCommission);
 
         var kpiComm = await _db.KpiCommissions
  .SingleOrDefaultAsync(x => x.SaleId == saleId && x.Year == year && x.Month == month, ct);
@@ -528,24 +532,26 @@ CancellationToken ct = default)
            .ToListAsync(ct);
 
         var paidOrders = orders.Where(o => o.Status == OrderStatus.Paid).ToList();
-        var actualRevenue = paidOrders.Sum(o => o.TotalPrice);
+        long actualRevenueLong = paidOrders.Sum(o => (long)o.TotalPrice);
+        var actualRevenue = MoneyCalc.ClampToInt(actualRevenueLong);
 
-        var estimatedBaseCommission = actualRevenue * DEFAULT_COMMISSION_PERCENT / 100;
+        // FIX: prevent overflow by using helper
+        var estimatedBaseCommission = MoneyCalc.PercentOf(actualRevenue, DEFAULT_COMMISSION_PERCENT);
 
         // Available tiers (MinRevenue interpreted as MinAchievedPercent)
         var availableTiers = await _db.KpiTiers
- .AsNoTracking()
- .OrderBy(x => x.DisplayOrder)
- .Select(x => new KpiTierDto
- {
-     KpiTierId = x.KpiTierId,
-     Name = x.Name,
-     MinRevenue = x.MinRevenue,
-     BonusPercent = x.BonusPercent,
-     Description = x.Description,
-     DisplayOrder = x.DisplayOrder
- })
-          .ToListAsync(ct);
+         .AsNoTracking()
+         .OrderBy(x => x.DisplayOrder)
+         .Select(x => new KpiTierDto
+         {
+             KpiTierId = x.KpiTierId,
+             Name = x.Name,
+             MinRevenue = x.MinRevenue,
+             BonusPercent = x.BonusPercent,
+             Description = x.Description,
+             DisplayOrder = x.DisplayOrder
+         })
+         .ToListAsync(ct);
 
         int estimatedBonusCommission = 0;
         int? currentTierId = null;
@@ -565,7 +571,7 @@ CancellationToken ct = default)
             {
                 currentTierId = tier.KpiTierId;
                 currentTierName = tier.Name;
-                estimatedBonusCommission = actualRevenue * Math.Clamp(tier.BonusPercent, 0, 100) / 100;
+                estimatedBonusCommission = MoneyCalc.PercentOf(actualRevenue, Math.Clamp(tier.BonusPercent, 0, 100));
             }
         }
 
@@ -579,7 +585,7 @@ CancellationToken ct = default)
             ActualRevenue = actualRevenue,
             EstimatedBaseCommission = estimatedBaseCommission,
             EstimatedBonusCommission = estimatedBonusCommission,
-            EstimatedTotalCommission = estimatedBaseCommission + estimatedBonusCommission,
+            EstimatedTotalCommission = MoneyCalc.SafeAdd(estimatedBaseCommission, estimatedBonusCommission),
             CurrentKpiTierId = currentTierId,
             CurrentKpiTierName = currentTierName,
             TotalOrdersThisMonth = orders.Count,
