@@ -514,3 +514,319 @@ Authorization: Bearer {{token}}
  "query": "query($pagination: PaginationInput, $filter: KpiCommissionFilterInput) { kpiCommissions(pagination: $pagination, filter: $filter) { statusCode success message data { page pageSize totalItems totalPages items { kpiCommissionId saleId saleName year month baseCommission bonusCommission totalCommission kpiTierName totalRevenue totalOrders calculatedAt } } } }",
  "variables": { "pagination": { "page":1, "pageSize":10 }, "filter": { "saleId": {{saleId}}, "year": {{year}}, "month": {{month}} } }
 }
+
+### ------------------------------------------------
+### AUTH
+### ------------------------------------------------
+
+### A1) Login (get JWT)
+POST {{host}}/graphql
+Content-Type: application/json
+
+{
+ "query": "mutation($input: LoginInput!) { login(input: $input) { statusCode success message data { userId username fullName roles token } } }",
+ "variables": { "input": { "username": "admin", "password": "admin123" } }
+}
+
+### ------------------------------------------------
+### CATEGORIES
+### ------------------------------------------------
+
+@categoryId =1
+
+### CA1) List categories
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($pagination: PaginationInput, $search: $search) { categories(pagination: $pagination, search: $search) { statusCode success message data { page pageSize totalItems totalPages items { categoryId name description productCount } } } }",
+ "variables": { "pagination": { "page": {{page}}, "pageSize": {{pageSize}} }, "search": null }
+}
+
+### CA2) Category by id
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($id: Int!) { categoryById(categoryId: $id) { statusCode success message data { categoryId name description productCount } } }",
+ "variables": { "id": {{categoryId}} }
+}
+
+### CA3) Create category (Admin/Moderator)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "mutation($input: CreateCategoryInput!) { createCategory(input: $input) { statusCode success message data { categoryId name description productCount } } }",
+ "variables": { "input": { "name": "Accessories", "description": "Cables, chargers, adapters" } }
+}
+
+### CA4) Update category (Admin/Moderator)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "mutation($id: Int!, $input: UpdateCategoryInput!) { updateCategory(categoryId: $id, input: $input) { statusCode success message data { categoryId name description productCount } } }",
+ "variables": { "id": {{categoryId}}, "input": { "name": "Accessories (Updated)", "description": "Updated" } }
+}
+
+### CA5) Delete category (Admin/Moderator)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "mutation($id: Int!) { deleteCategory(categoryId: $id) { statusCode success message data { categoryId } } }",
+ "variables": { "id": {{categoryId}} }
+}
+
+### ------------------------------------------------
+### PRODUCTS
+### ------------------------------------------------
+
+@productId =1
+
+### PRD1) List products
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($pagination: PaginationInput, $filter: ProductFilterInput, $sort: ProductSortInput) { products(pagination: $pagination, filter: $filter, sort: $sort) { statusCode success message data { page pageSize totalItems totalPages items { productId sku name salePrice discountPct finalPrice stockQuantity categoryName } } } }",
+ "variables": { "pagination": { "page": {{page}}, "pageSize": {{pageSize}} }, "filter": { "search": null, "categoryId": null, "minPrice": null, "maxPrice": null }, "sort": { "field": "NAME", "asc": true } }
+}
+
+### PRD2) Product by id
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($id: Int!) { productById(productId: $id) { statusCode success message data { productId sku name importPrice salePrice discountPct finalPrice stockQuantity description categoryId categoryName imagePaths } } }",
+ "variables": { "id": {{productId}} }
+}
+
+### PRD3) Create product (Admin/Moderator)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "mutation($input: CreateProductInput!) { createProduct(input: $input) { statusCode success message data { productId sku name salePrice stockQuantity categoryId categoryName } } }",
+ "variables": { "input": { "sku": "TEST-001", "name": "Test Product", "importPrice":100000, "salePrice":150000, "stockQuantity":10, "description": "Test", "categoryId": {{categoryId}}, "imagePaths": [] } }
+}
+
+### PRD4) Update product (Admin/Moderator)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "mutation($id: Int!, $input: UpdateProductInput!) { updateProduct(productId: $id, input: $input) { statusCode success message data { productId sku name salePrice stockQuantity categoryId categoryName } } }",
+ "variables": { "id": {{productId}}, "input": { "name": "Test Product (Updated)", "stockQuantity":20 } }
+}
+
+### PRD5) Delete product (Admin/Moderator)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "mutation($id: Int!) { deleteProduct(productId: $id) { statusCode success message } }",
+ "variables": { "id": {{productId}} }
+}
+
+### ------------------------------------------------
+### CUSTOMERS
+### ------------------------------------------------
+
+@customerId =1
+
+### CU1) List customers
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($pagination: PaginationInput, $filter: CustomerFilterInput) { customers(pagination: $pagination, filter: $filter) { statusCode success message data { page pageSize totalItems totalPages items { customerId name phone email address orderCount } } } }",
+ "variables": { "pagination": { "page": {{page}}, "pageSize": {{pageSize}} }, "filter": { "search": null } }
+}
+
+### CU2) Customer by id
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($id: Int!) { customerById(customerId: $id) { statusCode success message data { customerId name phone email address orderCount } } }",
+ "variables": { "id": {{customerId}} }
+}
+
+### CU3) Create customer
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "mutation($input: CreateCustomerInput!) { createCustomer(input: $input) { statusCode success message data { customerId name phone email address orderCount } } }",
+ "variables": { "input": { "name": "New Customer", "phone": "0900000000", "email": "new@example.com", "address": "HCM" } }
+}
+
+### CU4) Update customer
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "mutation($id: Int!, $input: UpdateCustomerInput!) { updateCustomer(customerId: $id, input: $input) { statusCode success message data { customerId name phone email address orderCount } } }",
+ "variables": { "id": {{customerId}}, "input": { "address": "Updated Address" } }
+}
+
+### CU5) Delete customer
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "mutation($id: Int!) { deleteCustomer(customerId: $id) { statusCode success message } }",
+ "variables": { "id": {{customerId}} }
+}
+
+### ------------------------------------------------
+### PROMOTION (EXTRA)
+### ------------------------------------------------
+
+@productId =1
+
+### PX1) Best discount percent for a product
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($productId: Int!, $at: DateTime) { bestDiscountPct(productId: $productId, at: $at) { statusCode success message data } }",
+ "variables": { "productId": {{productId}}, "at": null }
+}
+
+### ------------------------------------------------
+### DASHBOARD (Admin/Moderator)
+### ------------------------------------------------
+
+### D1) Overview
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query { reportOverview { statusCode success message data { totalProducts totalOrdersToday revenueToday } } }"
+}
+
+### D2) Low stock products
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($threshold: Int, $take: Int) { reportLowStockProducts(threshold: $threshold, take: $take) { statusCode success message data { productId sku name stockQuantity } } }",
+ "variables": { "threshold":5, "take":5 }
+}
+
+### D3) Top selling products
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($dateRange: DateRangeInput, $take: Int) { reportTopSellingProducts(dateRange: $dateRange, take: $take) { statusCode success message data { productId sku name totalQuantity totalRevenue } } }",
+ "variables": { "dateRange": null, "take":5 }
+}
+
+### D4) Recent orders
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($take: Int) { reportRecentOrders(take: $take) { statusCode success message data { orderId status createdAt totalPrice customerName saleName } } }",
+ "variables": { "take":3 }
+}
+
+### D5) Daily revenue in month
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($year: Int, $month: Int) { reportDailyRevenueInMonth(year: $year, month: $month) { statusCode success message data { date revenue } } }",
+ "variables": { "year": null, "month": null }
+}
+
+### ------------------------------------------------
+### REPORTS (Admin/Moderator)
+### ------------------------------------------------
+
+### R1) Product sales series
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($dateRange: DateRangeInput!, $groupBy: ReportGroupBy!, $filter: ProductSalesReportFilterInput) { reportProductSalesSeries(dateRange: $dateRange, groupBy: $groupBy, filter: $filter) { statusCode success message data { productId sku name points { period value } } } }",
+ "variables": { "dateRange": { "from": "2025-12-01T00:00:00Z", "to": "2025-12-31T00:00:00Z" }, "groupBy": "DAY", "filter": { "categoryId": null, "top":5 } }
+}
+
+### R2) Revenue/profit series
+
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($dateRange: DateRangeInput!, $groupBy: ReportGroupBy!) { reportRevenueProfitSeries(dateRange: $dateRange, groupBy: $groupBy) { statusCode success message data { period revenue profit } } }",
+ "variables": { "dateRange": { "from": "2025-12-01T00:00:00Z", "to": "2025-12-31T00:00:00Z" }, "groupBy": "DAY" }
+}
+
+### ------------------------------------------------
+### UPLOAD (Admin/Moderator)
+### ------------------------------------------------
+
+@publicId = myshop/temp-products/sample
+
+### UP1) Upload image asset (GraphQL multipart request)
+### Endpoint: `uploadProductAsset(file: Upload!)`
+### NOTE:
+### - JetBrains/VS Code REST Client syntax shown below.
+### - Replace `./test.jpg` with an existing file path.
+### - This mutation requires Authorization header.
+POST {{host}}/graphql
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=----MyBoundary
+
+------MyBoundary
+Content-Disposition: form-data; name="operations"
+
+{"query":"mutation ($file: Upload!) { uploadProductAsset(file: $file) { statusCode success message data { url publicId } } }","variables":{"file":null}}
+------MyBoundary
+Content-Disposition: form-data; name="map"
+
+{"0":["variables.file"]}
+------MyBoundary
+Content-Disposition: form-data; name="0"; filename="test.jpg"
+Content-Type: image/jpeg
+
+< ./test.jpg
+------MyBoundary--
+
+### UP2) Delete uploaded asset by publicId
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "mutation($publicId: String!) { deleteUploadedAsset(publicId: $publicId) { statusCode success message data } }",
+ "variables": { "publicId": "{{publicId}}" }
+}
