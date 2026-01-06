@@ -13,7 +13,11 @@
 
         public ICollection<UserRole> UserRoles { get; set; }
         public ICollection<Order> Orders { get; set; }      // Sale tạo đơn
-        public ICollection<Commission> Commissions { get; set; }
-        public ICollection<AuditLog> AuditLogs { get; set; }
+  
+        // KPI
+        public ICollection<SaleKpiTarget> SaleKpiTargets { get; set; } = new List<SaleKpiTarget>();
+        public ICollection<KpiCommission> KpiCommissions { get; set; } = new List<KpiCommission>();
+
+        public ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
     }
 }
