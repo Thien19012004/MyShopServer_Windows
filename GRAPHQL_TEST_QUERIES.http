@@ -5,406 +5,512 @@
 @host = https://localhost:5135
 @token = YOUR_JWT_TOKEN_HERE
 
-@page = 1
-@pageSize = 20
+@page =1
+@pageSize =20
 
 # Example IDs (edit)
-@promotionId = 1
-@orderId = 1
+@promotionId =1
+@orderId =1
 
 # KPI examples (edit)
-@saleId = 3
-@year = 2025
-@month = 12
-@kpiTierId = 1
+@saleId =3
+@year =2025
+@month =12
+@kpiTierId =1
+
+# USER examples (edit)
+@userId =1
+
+### ------------------------------------------------
+### USERS
+### ------------------------------------------------
+
+### U1) List users (Admin/Moderator)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($pagination: PaginationInput, $filter: UserFilterInput) { users(pagination: $pagination, filter: $filter) { statusCode success message data { page pageSize totalItems totalPages items { userId username fullName isActive createdAt roles } } } }",
+ "variables": {
+ "pagination": { "page": {{page}}, "pageSize": {{pageSize}} },
+ "filter": { "search": null, "isActive": null, "role": null }
+ }
+}
+
+### U2) List SALES only (filter by role=Sale)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($pagination: PaginationInput, $filter: UserFilterInput) { users(pagination: $pagination, filter: $filter) { statusCode success message data { page pageSize totalItems totalPages items { userId username fullName isActive roles } } } }",
+ "variables": {
+ "pagination": { "page":1, "pageSize":50 },
+ "filter": { "role": "SALE", "isActive": true }
+ }
+}
+
+### U3) User by id
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "query($id: Int!) { userById(userId: $id) { statusCode success message data { userId username fullName isActive createdAt roles } } }",
+ "variables": { "id": {{userId}} }
+}
+
+### U4) Create user (Admin only)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "mutation($input: CreateUserInput!) { createUser(input: $input) { statusCode success message data { userId username fullName isActive roles createdAt } } }",
+ "variables": {
+ "input": {
+ "username": "sale_test_01",
+ "password": "sale123",
+ "fullName": "Sale Test01",
+ "isActive": true,
+ "roles": ["SALE"]
+ }
+ }
+}
+
+### U5) Update user (Admin/Moderator)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "mutation($id: Int!, $input: UpdateUserInput!) { updateUser(userId: $id, input: $input) { statusCode success message data { userId username fullName isActive roles } } }",
+ "variables": {
+ "id": {{userId}},
+ "input": {
+ "fullName": "Updated FullName",
+ "isActive": true,
+ "roles": ["SALE"]
+ }
+ }
+}
+
+### U6) Set user active/inactive (Admin/Moderator) - soft delete / restore
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "mutation($id: Int!, $isActive: Boolean!) { setUserActive(userId: $id, isActive: $isActive) { statusCode success message data } }",
+ "variables": {
+ "id": {{userId}},
+ "isActive": false
+ }
+}
+
+### U7) Reset user password (Admin only)
+POST {{host}}/graphql
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+ "query": "mutation($input: ResetPasswordInput!) { resetUserPassword(input: $input) { statusCode success message data } }",
+ "variables": {
+ "input": {
+ "userId": {{userId}},
+ "newPassword": "new_password_123"
+ }
+ }
+}
 
 ### ------------------------------------------------
 ### PROMOTIONS
 ### ------------------------------------------------
 
-### 1) Create PRODUCT promotion (requires productIds)
+###1) Create PRODUCT promotion (requires productIds)
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($input: CreatePromotionInput!) { createPromotion(input: $input) { success statusCode message data { promotionId name discountPercent startDate endDate scope productIds categoryIds } } }",
-  "variables": {
-    "input": {
-      "name": "Product -15%",
-      "discountPercent": 15,
-      "startDate": "2025-12-19T00:00:00Z",
-      "endDate": "2025-12-31T23:59:59Z",
-      "scope": "PRODUCT",
-      "productIds": [1, 2]
-    }
-  }
+ "query": "mutation($input: CreatePromotionInput!) { createPromotion(input: $input) { success statusCode message data { promotionId name discountPercent startDate endDate scope productIds categoryIds } } }",
+ "variables": {
+ "input": {
+ "name": "Product -15%",
+ "discountPercent":15,
+ "startDate": "2025-12-19T00:00:00Z",
+ "endDate": "2025-12-31T23:59:59Z",
+ "scope": "PRODUCT",
+ "productIds": [1,2]
+ }
+ }
 }
 
-### 2) Create CATEGORY promotion (requires categoryIds)
+###2) Create CATEGORY promotion (requires categoryIds)
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($input: CreatePromotionInput!) { createPromotion(input: $input) { success statusCode message data { promotionId name discountPercent startDate endDate scope productIds categoryIds } } }",
-  "variables": {
-    "input": {
-      "name": "Category -10%",
-      "discountPercent": 10,
-      "startDate": "2025-12-19T00:00:00Z",
-      "endDate": "2025-12-31T23:59:59Z",
-      "scope": "CATEGORY",
-      "categoryIds": [1]
-    }
-  }
+ "query": "mutation($input: CreatePromotionInput!) { createPromotion(input: $input) { success statusCode message data { promotionId name discountPercent startDate endDate scope productIds categoryIds } } }",
+ "variables": {
+ "input": {
+ "name": "Category -10%",
+ "discountPercent":10,
+ "startDate": "2025-12-19T00:00:00Z",
+ "endDate": "2025-12-31T23:59:59Z",
+ "scope": "CATEGORY",
+ "categoryIds": [1]
+ }
+ }
 }
 
-### 3) Create ORDER promotion (no productIds/categoryIds)
+###3) Create ORDER promotion (no productIds/categoryIds)
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($input: CreatePromotionInput!) { createPromotion(input: $input) { success statusCode message data { promotionId name discountPercent startDate endDate scope } } }",
-  "variables": {
-    "input": {
-      "name": "Order -5%",
-      "discountPercent": 5,
-      "startDate": "2025-12-19T00:00:00Z",
-      "endDate": "2025-12-31T23:59:59Z",
-      "scope": "ORDER"
-    }
-  }
+ "query": "mutation($input: CreatePromotionInput!) { createPromotion(input: $input) { success statusCode message data { promotionId name discountPercent startDate endDate scope } } }",
+ "variables": {
+ "input": {
+ "name": "Order -5%",
+ "discountPercent":5,
+ "startDate": "2025-12-19T00:00:00Z",
+ "endDate": "2025-12-31T23:59:59Z",
+ "scope": "ORDER"
+ }
+ }
 }
 
-### 4) List promotions (FE: scope + onlyActive + paging)
+###4) List promotions (FE: scope + onlyActive + paging)
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "query($pagination: PaginationInput, $filter: PromotionFilterInput) { promotions(pagination: $pagination, filter: $filter) { statusCode success message data { page pageSize totalItems totalPages items { promotionId name discountPercent startDate endDate scope productIds categoryIds } } } }",
-  "variables": {
-    "pagination": { "page": {{page}}, "pageSize": {{pageSize}} },
-    "filter": { "scope": null, "onlyActive": false }
-  }
+ "query": "query($pagination: PaginationInput, $filter: PromotionFilterInput) { promotions(pagination: $pagination, filter: $filter) { statusCode success message data { page pageSize totalItems totalPages items { promotionId name discountPercent startDate endDate scope productIds categoryIds } } } }",
+ "variables": {
+ "pagination": { "page": {{page}}, "pageSize": {{pageSize}} },
+ "filter": { "scope": null, "onlyActive": false }
+ }
 }
 
-### 5) List promotions - only ACTIVE ORDER (FE chọn promotion cho Order)
+###5) List promotions - only ACTIVE ORDER (FE chọn promotion cho Order)
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "query($pagination: PaginationInput, $filter: PromotionFilterInput) { promotions(pagination: $pagination, filter: $filter) { statusCode success message data { page pageSize totalItems totalPages items { promotionId name discountPercent startDate endDate scope } } } }",
-  "variables": {
-    "pagination": { "page": 1, "pageSize": 50 },
-    "filter": { "scope": "ORDER", "onlyActive": true }
-  }
+ "query": "query($pagination: PaginationInput, $filter: PromotionFilterInput) { promotions(pagination: $pagination, filter: $filter) { statusCode success message data { page pageSize totalItems totalPages items { promotionId name discountPercent startDate endDate scope } } } }",
+ "variables": {
+ "pagination": { "page":1, "pageSize":50 },
+ "filter": { "scope": "ORDER", "onlyActive": true }
+ }
 }
 
-### 6) Promotion by id
+###6) Promotion by id
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "query($id: Int!) { promotionById(promotionId: $id) { statusCode success message data { promotionId name discountPercent startDate endDate scope productIds categoryIds } } }",
-  "variables": { "id": {{promotionId}} }
+ "query": "query($id: Int!) { promotionById(promotionId: $id) { statusCode success message data { promotionId name discountPercent startDate endDate scope productIds categoryIds } } }",
+ "variables": { "id": {{promotionId}} }
 }
 
-### 7) Update promotion (only when NOT active)
+###7) Update promotion (only when NOT active)
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($id: Int!, $input: UpdatePromotionInput!) { updatePromotion(promotionId: $id, input: $input) { success statusCode message data { promotionId name discountPercent startDate endDate scope productIds categoryIds } } }",
-  "variables": {
-    "id": {{promotionId}},
-    "input": {
-      "name": "Order -7% (updated)",
-      "discountPercent": 7,
-      "startDate": "2026-01-01T00:00:00Z",
-      "endDate": "2026-01-31T23:59:59Z",
-      "scope": "ORDER"
-    }
-  }
+ "query": "mutation($id: Int!, $input: UpdatePromotionInput!) { updatePromotion(promotionId: $id, input: $input) { success statusCode message data { promotionId name discountPercent startDate endDate scope productIds categoryIds } } }",
+ "variables": {
+ "id": {{promotionId}},
+ "input": {
+ "name": "Order -7% (updated)",
+ "discountPercent":7,
+ "startDate": "2026-01-01T00:00:00Z",
+ "endDate": "2026-01-31T23:59:59Z",
+ "scope": "ORDER"
+ }
+ }
 }
 
-### 8) Delete promotion
+###8) Delete promotion
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($id: Int!) { deletePromotion(promotionId: $id) { success statusCode message } }",
-  "variables": { "id": {{promotionId}} }
+ "query": "mutation($id: Int!) { deletePromotion(promotionId: $id) { success statusCode message } }",
+ "variables": { "id": {{promotionId}} }
 }
 
 ### ------------------------------------------------
 ### ORDERS
 ### ------------------------------------------------
 
-### 9) Create order (promotionIds: ONLY ORDER-scope)
+###9) Create order (promotionIds: ONLY ORDER-scope)
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($input: CreateOrderInput!) { createOrder(input: $input) { success statusCode message data { orderId status totalPrice subtotal orderDiscountAmount orderDiscountPercentApplied promotionIds createdAt items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
-  "variables": {
-    "input": {
-      "customerId": 1,
-      "saleId": 3,
-      "promotionIds": [7],
-      "items": [
-        { "productId": 1, "quantity": 2 },
-        { "productId": 2, "quantity": 1 }
-      ]
-    }
-  }
+ "query": "mutation($input: CreateOrderInput!) { createOrder(input: $input) { success statusCode message data { orderId status totalPrice subtotal orderDiscountAmount orderDiscountPercentApplied promotionIds createdAt items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
+ "variables": {
+ "input": {
+ "customerId":1,
+ "saleId":3,
+ "promotionIds": [7],
+ "items": [
+ { "productId":1, "quantity":2 },
+ { "productId":2, "quantity":1 }
+ ]
+ }
+ }
 }
 
-### 10) List orders (Order list screen)
+###10) List orders (Order list screen)
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "query($pagination: PaginationInput, $filter: OrderFilterInput, $dateRange: DateRangeInput) { orders(pagination: $pagination, filter: $filter, dateRange: $dateRange) { statusCode success message data { page pageSize totalItems totalPages items { orderId status createdAt customerName saleName subtotal orderDiscountAmount totalPrice itemsCount } } } }",
-  "variables": {
-    "pagination": { "page": {{page}}, "pageSize": {{pageSize}} },
-    "filter": null,
-    "dateRange": null
-  }
+ "query": "query($pagination: PaginationInput, $filter: OrderFilterInput, $dateRange: DateRangeInput) { orders(pagination: $pagination, filter: $filter, dateRange: $dateRange) { statusCode success message data { page pageSize totalItems totalPages items { orderId status createdAt customerName saleName subtotal orderDiscountAmount totalPrice itemsCount } } } }",
+ "variables": {
+ "pagination": { "page": {{page}}, "pageSize": {{pageSize}} },
+ "filter": null,
+ "dateRange": null
+ }
 }
 
-### 11) Order by id (detail screen)
+###11) Order by id (detail screen)
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "query($id: Int!) { orderById(orderId: $id) { statusCode success message data { orderId status totalPrice subtotal orderDiscountAmount orderDiscountPercentApplied promotionIds customerId customerName saleId saleName createdAt items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
-  "variables": { "id": {{orderId}} }
+ "query": "query($id: Int!) { orderById(orderId: $id) { statusCode success message data { orderId status totalPrice subtotal orderDiscountAmount orderDiscountPercentApplied promotionIds customerId customerName saleId saleName createdAt items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
+ "variables": { "id": {{orderId}} }
 }
 
-### 12) Update order - replace promotions ONLY
+###12) Update order - replace promotions ONLY
 ### - empty array [] => remove all promotions
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status subtotal orderDiscountAmount totalPrice promotionIds } } }",
-  "variables": {
-    "id": {{orderId}},
-    "input": {
-      "promotionIds": [7]
-    }
-  }
+ "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status subtotal orderDiscountAmount totalPrice promotionIds } } }",
+ "variables": {
+ "id": {{orderId}},
+ "input": {
+ "promotionIds": [7]
+ }
+ }
 }
 
-### 13) Update order - remove all promotions
+###13) Update order - remove all promotions
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status subtotal orderDiscountAmount totalPrice promotionIds } } }",
-  "variables": {
-    "id": {{orderId}},
-    "input": {
-      "promotionIds": []
-    }
-  }
+ "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status subtotal orderDiscountAmount totalPrice promotionIds } } }",
+ "variables": {
+ "id": {{orderId}},
+ "input": {
+ "promotionIds": []
+ }
+ }
 }
 
-### 14) Update order - replace items ONLY
+###14) Update order - replace items ONLY
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status subtotal orderDiscountAmount totalPrice promotionIds items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
-  "variables": {
-    "id": {{orderId}},
-    "input": {
-      "items": [
-        { "productId": 1, "quantity": 1 }
-      ]
-    }
-  }
+ "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status subtotal orderDiscountAmount totalPrice promotionIds items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
+ "variables": {
+ "id": {{orderId}},
+ "input": {
+ "items": [
+ { "productId":1, "quantity":1 }
+ ]
+ }
+ }
 }
 
-### 15) Update order - replace BOTH items + promotions
+###15) Update order - replace BOTH items + promotions
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status subtotal orderDiscountAmount totalPrice promotionIds items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
-  "variables": {
-    "id": {{orderId}},
-    "input": {
-      "promotionIds": [7],
-      "items": [
-        { "productId": 1, "quantity": 2 },
-        { "productId": 2, "quantity": 1 }
-      ]
-    }
-  }
+ "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status subtotal orderDiscountAmount totalPrice promotionIds items { orderItemId productId productName quantity unitPrice totalPrice } } } }",
+ "variables": {
+ "id": {{orderId}},
+ "input": {
+ "promotionIds": [7],
+ "items": [
+ { "productId":1, "quantity":2 },
+ { "productId":2, "quantity":1 }
+ ]
+ }
+ }
 }
 
-### 16) Mark order as PAID
+###16) Mark order as PAID
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($id: Int!) { updateOrder(orderId: $id, input: { status: PAID }) { success statusCode message data { orderId status totalPrice } } }",
-  "variables": { "id": {{orderId}} }
+ "query": "mutation($id: Int!) { updateOrder(orderId: $id, input: { status: PAID }) { success statusCode message data { orderId status totalPrice } } }",
+ "variables": { "id": {{orderId}} }
 }
 
-### 17) Try update Paid order (should fail)
+###17) Try update Paid order (should fail)
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status totalPrice } } }",
-  "variables": {
-    "id": {{orderId}},
-    "input": { "promotionIds": [] }
-  }
+ "query": "mutation($id: Int!, $input: UpdateOrderInput!) { updateOrder(orderId: $id, input: $input) { success statusCode message data { orderId status totalPrice } } }",
+ "variables": {
+ "id": {{orderId}},
+ "input": { "promotionIds": [] }
+ }
 }
 
-### 18) Delete order
+###18) Delete order
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($id: Int!) { deleteOrder(orderId: $id) { success statusCode message } }",
-  "variables": { "id": {{orderId}} }
+ "query": "mutation($id: Int!) { deleteOrder(orderId: $id) { success statusCode message } }",
+ "variables": { "id": {{orderId}} }
 }
 
 ### ------------------------------------------------
 ### KPI
 ### ------------------------------------------------
 
-### 19) KPI - list tiers
+###19) KPI - list tiers
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "query($page: Int!, $pageSize: Int!) { kpiTiers(page: $page, pageSize: $pageSize) { statusCode success message data { page pageSize totalItems totalPages items { kpiTierId name minRevenue bonusPercent description displayOrder } } } }",
-  "variables": { "page": 1, "pageSize": 10 }
+ "query": "query($page: Int!, $pageSize: Int!) { kpiTiers(page: $page, pageSize: $pageSize) { statusCode success message data { page pageSize totalItems totalPages items { kpiTierId name minRevenue bonusPercent description displayOrder } } } }",
+ "variables": { "page":1, "pageSize":10 }
 }
 
-### 20) KPI - create tier
+###20) KPI - create tier
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($input: CreateKpiTierInput!) { createKpiTier(input: $input) { statusCode success message data { kpiTierId name minRevenue bonusPercent description displayOrder } } }",
-  "variables": {
-    "input": {
-      "name": "Diamond",
-      "minRevenue": 250,
-      "bonusPercent": 15,
-      "description": "Đạt >=250% target tháng - Thưởng thêm15%",
-      "displayOrder": 5
-    }
-  }
+ "query": "mutation($input: CreateKpiTierInput!) { createKpiTier(input: $input) { statusCode success message data { kpiTierId name minRevenue bonusPercent description displayOrder } } }",
+ "variables": {
+ "input": {
+ "name": "Diamond",
+ "minRevenue":250,
+ "bonusPercent":15,
+ "description": "Đạt >=250% target tháng - Thưởng thêm15%",
+ "displayOrder":5
+ }
+ }
 }
 
-### 21) KPI - update tier
+###21) KPI - update tier
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($id: Int!, $input: UpdateKpiTierInput!) { updateKpiTier(kpiTierId: $id, input: $input) { statusCode success message } }",
-  "variables": {
-    "id": {{kpiTierId}},
-    "input": {
-      "name": "Bronze",
-      "minRevenue": 100,
-      "bonusPercent": 2,
-      "description": "Đạt >=100% target tháng - Thưởng thêm2%",
-      "displayOrder": 1
-    }
-  }
+ "query": "mutation($id: Int!, $input: UpdateKpiTierInput!) { updateKpiTier(kpiTierId: $id, input: $input) { statusCode success message } }",
+ "variables": {
+ "id": {{kpiTierId}},
+ "input": {
+ "name": "Bronze",
+ "minRevenue":100,
+ "bonusPercent":2,
+ "description": "Đạt >=100% target tháng - Thưởng thêm2%",
+ "displayOrder":1
+ }
+ }
 }
 
-### 22) KPI - delete tier
+###22) KPI - delete tier
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($id: Int!) { deleteKpiTier(kpiTierId: $id) { statusCode success message } }",
-  "variables": { "id": {{kpiTierId}} }
+ "query": "mutation($id: Int!) { deleteKpiTier(kpiTierId: $id) { statusCode success message } }",
+ "variables": { "id": {{kpiTierId}} }
 }
 
-### 23) KPI - set monthly target
+###23) KPI - set monthly target
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($input: SetMonthlyTargetInput!) { setMonthlyTarget(input: $input) { statusCode success message data { saleKpiTargetId saleId saleName year month targetRevenue actualRevenue progress remainingRevenue kpiTierId kpiTierName bonusAmount calculatedAt createdAt } } }",
-  "variables": {
-    "input": {
-      "saleId": {{saleId}},
-      "year": {{year}},
-      "month": {{month}},
-      "targetRevenue": 150000000
-    }
-  }
+ "query": "mutation($input: SetMonthlyTargetInput!) { setMonthlyTarget(input: $input) { statusCode success message data { saleKpiTargetId saleId saleName year month targetRevenue actualRevenue progress remainingRevenue kpiTierId kpiTierName bonusAmount calculatedAt createdAt } } }",
+ "variables": {
+ "input": {
+ "saleId": {{saleId}},
+ "year": {{year}},
+ "month": {{month}},
+ "targetRevenue":150000000
+ }
+ }
 }
 
-### 24) KPI - list targets
+###24) KPI - list targets
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "query($saleId: Int, $year: Int, $month: Int, $page: Int!, $pageSize: Int!) { saleKpiTargets(saleId: $saleId, year: $year, month: $month, page: $page, pageSize: $pageSize) { statusCode success message data { page pageSize totalItems totalPages items { saleKpiTargetId saleId saleName year month targetRevenue actualRevenue progress remainingRevenue kpiTierName bonusAmount calculatedAt createdAt } } } }",
-  "variables": { "saleId": null, "year": {{year}}, "month": {{month}}, "page": 1, "pageSize": 10 }
+ "query": "query($saleId: Int, $year: Int, $month: Int, $page: Int!, $pageSize: Int!) { saleKpiTargets(saleId: $saleId, year: $year, month: $month, page: $page, pageSize: $pageSize) { statusCode success message data { page pageSize totalItems totalPages items { saleKpiTargetId saleId saleName year month targetRevenue actualRevenue progress remainingRevenue kpiTierName bonusAmount calculatedAt createdAt } } } }",
+ "variables": { "saleId": null, "year": {{year}}, "month": {{month}}, "page":1, "pageSize":10 }
 }
 
-### 25) KPI - dashboard (estimate, not persisted)
+###25) KPI - dashboard (estimate, not persisted)
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "query($saleId: Int!, $year: Int, $month: Int) { kpiDashboard(saleId: $saleId, year: $year, month: $month) { statusCode success message data { saleId saleName currentYear currentMonth targetRevenue actualRevenue progress remainingRevenue estimatedBaseCommission estimatedBonusCommission estimatedTotalCommission currentKpiTierId currentKpiTierName totalOrdersThisMonth totalOrdersPaid availableTiers { kpiTierId name minRevenue bonusPercent displayOrder } } } }",
-  "variables": { "saleId": {{saleId}}, "year": {{year}}, "month": {{month}} }
+ "query": "query($saleId: Int!, $year: Int, $month: Int) { kpiDashboard(saleId: $saleId, year: $year, month: $month) { statusCode success message data { saleId saleName currentYear currentMonth targetRevenue actualRevenue progress remainingRevenue estimatedBaseCommission estimatedBonusCommission estimatedTotalCommission currentKpiTierId currentKpiTierName totalOrdersThisMonth totalOrdersPaid availableTiers { kpiTierId name minRevenue bonusPercent displayOrder } } } }",
+ "variables": { "saleId": {{saleId}}, "year": {{year}}, "month": {{month}} }
 }
 
-### 26) KPI - calculate monthly KPI (persist to KpiCommissions)
+###26) KPI - calculate monthly KPI (persist to KpiCommissions)
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "mutation($input: CalculateMonthlyKpiInput!) { calculateMonthlyKpi(input: $input) { statusCode success message data { kpiCommissionId saleId saleName year month baseCommission bonusCommission totalCommission kpiTierId kpiTierName totalRevenue totalOrders calculatedAt } } }",
-  "variables": { "input": { "year": {{year}}, "month": {{month}} } }
+ "query": "mutation($input: CalculateMonthlyKpiInput!) { calculateMonthlyKpi(input: $input) { statusCode success message data { kpiCommissionId saleId saleName year month baseCommission bonusCommission totalCommission kpiTierId kpiTierName totalRevenue totalOrders calculatedAt } } }",
+ "variables": { "input": { "year": {{year}}, "month": {{month}} } }
 }
 
-### 27) KPI - list KPI commissions
+###27) KPI - list KPI commissions
 POST {{host}}/graphql
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-  "query": "query($saleId: Int, $year: Int, $month: Int, $page: Int!, $pageSize: Int!) { kpiCommissions(saleId: $saleId, year: $year, month: $month, page: $page, pageSize: $pageSize) { statusCode success message data { page pageSize totalItems totalPages items { kpiCommissionId saleId saleName year month baseCommission bonusCommission totalCommission kpiTierName totalRevenue totalOrders calculatedAt } } } }",
-  "variables": { "saleId": {{saleId}}, "year": {{year}}, "month": {{month}}, "page": 1, "pageSize": 10 }
+ "query": "query($saleId: Int, $year: Int, $month: Int, $page: Int!, $pageSize: Int!) { kpiCommissions(saleId: $saleId, year: $year, month: $month, page: $page, pageSize: $pageSize) { statusCode success message data { page pageSize totalItems totalPages items { kpiCommissionId saleId saleName year month baseCommission bonusCommission totalCommission kpiTierName totalRevenue totalOrders calculatedAt } } } }",
+ "variables": { "saleId": {{saleId}}, "year": {{year}}, "month": {{month}}, "page":1, "pageSize":10 }
 }
