@@ -97,7 +97,7 @@ public class UserMutations
     }
 
     [Authorize(Roles = new[] { nameof(RoleName.Admin), nameof(RoleName.Moderator) })]
-    public async Task<BoolResultDto> SetUserActive(
+    public async Task<UserBoolResultDto> SetUserActive(
     int userId,
     bool isActive,
     [Service] IUserService userService,
@@ -108,7 +108,7 @@ public class UserMutations
             var ok = await userService.SetUserActiveAsync(userId, isActive, ct);
             if (!ok)
             {
-                return new BoolResultDto
+                return new UserBoolResultDto
                 {
                     StatusCode = 404,
                     Success = false,
@@ -117,7 +117,7 @@ public class UserMutations
                 };
             }
 
-            return new BoolResultDto
+            return new UserBoolResultDto
             {
                 StatusCode = 200,
                 Success = true,
@@ -127,7 +127,7 @@ public class UserMutations
         }
         catch (Exception ex)
         {
-            return new BoolResultDto
+            return new UserBoolResultDto
             {
                 StatusCode = 400,
                 Success = false,
@@ -138,7 +138,7 @@ public class UserMutations
     }
 
     [Authorize(Roles = new[] { nameof(RoleName.Admin) })]
-    public async Task<BoolResultDto> ResetUserPassword(
+    public async Task<UserBoolResultDto> ResetUserPassword(
     ResetPasswordInput input,
     [Service] IUserService userService,
     CancellationToken ct)
@@ -148,7 +148,7 @@ public class UserMutations
             var ok = await userService.ResetPasswordAsync(input.UserId, input.NewPassword, ct);
             if (!ok)
             {
-                return new BoolResultDto
+                return new UserBoolResultDto
                 {
                     StatusCode = 404,
                     Success = false,
@@ -157,7 +157,7 @@ public class UserMutations
                 };
             }
 
-            return new BoolResultDto
+            return new UserBoolResultDto
             {
                 StatusCode = 200,
                 Success = true,
@@ -167,7 +167,7 @@ public class UserMutations
         }
         catch (Exception ex)
         {
-            return new BoolResultDto
+            return new UserBoolResultDto
             {
                 StatusCode = 400,
                 Success = false,

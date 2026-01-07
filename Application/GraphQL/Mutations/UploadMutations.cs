@@ -1,6 +1,4 @@
-﻿using HotChocolate;
-using HotChocolate.Authorization;
-using HotChocolate.Types;
+﻿using HotChocolate.Authorization;
 using MyShopServer.Application.Services.Interfaces;
 using MyShopServer.Domain.Enums;
 using MyShopServer.DTOs.Uploads;
@@ -59,7 +57,7 @@ public class UploadMutations
     }
 
     [Authorize(Roles = new[] { nameof(RoleName.Admin), nameof(RoleName.Moderator) })]
-    public async Task<BoolResultDto> DeleteUploadedAsset(
+    public async Task<UploadBoolResultDto> DeleteUploadedAsset(
         string publicId,
         [Service] IImageStorageService storage,
         CancellationToken ct)
@@ -68,7 +66,7 @@ public class UploadMutations
         {
             await storage.DeleteByPublicIdAsync(publicId, ct);
 
-            return new BoolResultDto
+            return new UploadBoolResultDto
             {
                 StatusCode = 200,
                 Success = true,
@@ -78,7 +76,7 @@ public class UploadMutations
         }
         catch (Exception ex)
         {
-            return new BoolResultDto
+            return new UploadBoolResultDto
             {
                 StatusCode = 400,
                 Success = false,

@@ -10,4 +10,4 @@ public class UserListResultDto : MutationResult<PagedResult<UserDto>>
 {
 }
 
-public class BoolResultDto : MutationResult<bool> { }
+public class UserBoolResultDto : MutationResult<bool> { }

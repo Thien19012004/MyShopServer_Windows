@@ -10,7 +10,7 @@ namespace MyShopServer.Application.GraphQL.Queries;
 [ExtendObjectType(typeof(Query))]
 public class PromotionQueries
 {
-    [Authorize(Roles = new[] { nameof(RoleName.Admin), nameof(RoleName.Moderator) })]
+    [Authorize(Roles = new[] { nameof(RoleName.Admin), nameof(RoleName.Moderator), nameof(RoleName.Sale) })]
     public async Task<PromotionListResultDto> Promotions(
         PaginationInput? pagination,
         PromotionFilterInput? filter,
@@ -51,7 +51,7 @@ public class PromotionQueries
         }
     }
 
-    [Authorize(Roles = new[] { nameof(RoleName.Admin), nameof(RoleName.Moderator) })]
+    [Authorize(Roles = new[] { nameof(RoleName.Admin), nameof(RoleName.Moderator), nameof(RoleName.Sale) })]
     public async Task<PromotionResultDto> PromotionById(
         int promotionId,
         [Service] IPromotionService promotionService,
@@ -92,7 +92,7 @@ public class PromotionQueries
     }
 
     // optional: check best discount of a product at now
-    [Authorize(Roles = new[] { nameof(RoleName.Admin), nameof(RoleName.Moderator) })]
+    [Authorize(Roles = new[] { nameof(RoleName.Admin), nameof(RoleName.Moderator), nameof(RoleName.Sale) })]
     public async Task<IntResultDto> BestDiscountPct(
         int productId,
         DateTime? at,

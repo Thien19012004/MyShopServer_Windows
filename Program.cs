@@ -41,6 +41,7 @@ namespace MyShopServer
             builder.Services.AddScoped<IImageStorageService, CloudinaryImageStorageService>();
             builder.Services.AddScoped<ICustomerService, CustomerService>();
             builder.Services.AddScoped<IPromotionService, PromotionService>();
+            builder.Services.AddScoped<IKpiService, KpiService>();
             builder.Services.AddScoped<IUserService, UserService>();
 
             builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection("Cloudinary"));
@@ -91,6 +92,8 @@ namespace MyShopServer
                 .AddTypeExtension<CustomerMutations>()
                 .AddTypeExtension<PromotionQueries>()
                 .AddTypeExtension<PromotionMutations>()
+                .AddTypeExtension<KpiQueries>()
+                .AddTypeExtension<KpiMutations>()
                 .AddTypeExtension<UserQueries>()
                 .AddTypeExtension<UserMutations>()
                 .AddType<UploadType>()               
