@@ -123,6 +123,10 @@ namespace MyShopServer
             app.UseAuthentication();
             app.UseAuthorization();
 
+            // Health check cho Elastic Beanstalk
+            app.MapGet("/", () => Results.Ok("OK"));
+            app.MapGet("/health", () => Results.Ok("Healthy"));
+
             app.MapGraphQL("/graphql");
 
             await app.RunAsync();
